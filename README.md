@@ -1,28 +1,28 @@
 # l'Aicluse Agent Tools
 
-Publieke, deelbare agent tooling voor Claude Code, Codex en toekomstige
-coding-agents.
+Public, shareable agent tooling for Claude Code, Codex, and future coding
+agents.
 
-Deze repo is de publieke opvolger van geselecteerde tools uit
-`epologee/leclause-skills`. De migratie gebeurt plugin voor plugin: installeer
-eerst de nieuwe marketplace, vervang daarna alleen de plugins die hieronder
-staan, en laat `@leclause` staan zolang je nog oude plugins gebruikt.
+This repository is the public successor for selected tools from
+`epologee/leclause-skills`. Migration happens plugin by plugin: install the new
+marketplace first, replace only the plugins listed below, and keep `@leclause`
+installed as long as you still use legacy plugins from it.
 
-## Eerste slice
+## First slice
 
-De eerste plugins in deze nieuwe marketplace zijn `how-plugins-work` en
-`git-discipline`. `how-plugins-work` legt vast hoe plugin-namen, skill-namen,
-marketplace-aliassen, Claude manifests, Codex manifests en runtime caches zich
-tot elkaar verhouden. `git-discipline` is de eerste feature-complete migratie
-van oude tooling naar de nieuwe multi-agent plek.
+The first plugins in this new marketplace are `how-plugins-work` and
+`git-discipline`. `how-plugins-work` documents how plugin names, skill names,
+marketplace aliases, Claude manifests, Codex manifests, and runtime caches
+relate to each other. `git-discipline` is the first feature-complete migration
+from legacy tooling to the new multi-agent home.
 
-Tijdens de migratie blijft `epologee/leclause-skills` de bestaande publieke
-marketplace. Bestaande gebruikers hoeven nu niets te deinstalleren of te
-herinstalleren. Een rename van `@leclause` naar `@laicluse-agent-tools` gebeurt
-niet automatisch; beide aliases kunnen naast elkaar bestaan. Oude plugins
-verdwijnen pas nadat er per verwijderde plugin een werkende migratie-stub is.
+During the migration, `epologee/leclause-skills` remains the existing public
+marketplace. Existing users do not need to uninstall or reinstall anything yet.
+There is no automatic rename from `@leclause` to `@laicluse-agent-tools`; both
+aliases can exist side by side. Legacy plugins disappear only after each
+removed plugin has a working migration stub.
 
-## Installatie
+## Installation
 
 Claude Code:
 
@@ -40,8 +40,7 @@ codex plugin add how-plugins-work@laicluse-agent-tools
 codex plugin add git-discipline@laicluse-agent-tools
 ```
 
-Voor lokale ontwikkeling kun je de marketplace naar de working copy laten
-wijzen:
+For local development, point the marketplace at this working copy:
 
 ```bash
 claude plugins marketplace add ./
@@ -50,8 +49,8 @@ codex plugin marketplace add ./
 
 ## Plumbing
 
-Claude metadata is voorlopig de hand-edite bron. Codex metadata wordt
-gegenereerd:
+Claude metadata is currently the hand-edited source. Codex metadata is
+generated:
 
 ```bash
 bin/plugin-adapters build .
@@ -59,30 +58,30 @@ bin/plugin-adapters check .
 bin/plugin-adapters diff .
 ```
 
-Pluginversies volgen `1.0.<commit-count>` per package:
+Plugin versions follow `1.0.<commit-count>` per package:
 
 ```bash
 bin/plugin-versions --check
 bin/plugin-versions --write
 ```
 
-Activeer de lokale git hooks in deze clone:
+Enable the local git hooks in this clone:
 
 ```bash
 git config core.hooksPath hooks
 ```
 
-De pre-commit hook bumpet versies, bouwt Codex adapters en staged de gegenereerde
-targets. De commit-msg hook vraagt expliciet om `PII-Doublecheck: yes`, omdat
-deze repo uiteindelijk publiek bedoeld is.
+The pre-commit hook bumps versions, builds Codex adapters, and stages the
+generated targets. The commit-msg hook requires `PII-Doublecheck: yes` because
+this repository is public-facing.
 
-## Lokale storage
+## Local Storage
 
-Alle first-party runtime-state voor l'Aicluse Agent Tools gebruikt:
+All first-party runtime state for l'Aicluse Agent Tools uses:
 
 ```bash
 ${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}
 ```
 
-Agent-harness caches blijven waar de harness ze verwacht, bijvoorbeeld
-`~/.claude/plugins/cache` en `~/.codex/plugins/cache`.
+Agent-harness caches stay where the harness expects them, for example
+`~/.claude/plugins/cache` and `~/.codex/plugins/cache`.

@@ -1,45 +1,45 @@
-# Migratie naar l'Aicluse Agent Tools
+# Migration to l'Aicluse Agent Tools
 
-Status: publiek, eerste migratie-slice actief.
+Status: public, first migration slice active.
 
-## Besluit
+## Decision
 
-De oude publieke marketplace `epologee/leclause-skills` wordt niet in een keer
-gerenamed. Deze repo wordt de nieuwe publieke canonical plek onder de
-marketplace-alias `laicluse-agent-tools`.
+The legacy public marketplace `epologee/leclause-skills` will not be renamed in
+place. This repository becomes the new public canonical home under the
+`laicluse-agent-tools` marketplace alias.
 
-Tijdens de overgang:
+During the transition:
 
-- `leclause-skills` blijft de bestaande publieke bron voor gebruikers.
-- `laicluse-agent-tools` is de nieuwe publieke plek voor multi-agent-compatible
-  opvolgers.
-- `how-plugins-work` en git-discipline mogen tijdelijk op meerdere plekken
-  bestaan. Dat is migratieduplicatie, geen DRY-probleem.
-- De nieuwe canonical plugin-naam voor git-discipline is
-  `git-discipline@laicluse-agent-tools`; de oude publieke naam `gitgit@leclause`
-  blijft legacy totdat de oude marketplace een plugin-specifieke migratie-stub
-  kan dragen.
-- Migratiestatus hoort hier en in package-specifieke changelogs/stubs, niet in
-  `how-plugins-work`. Die skill documenteert alleen plugin-mechanics zoals
-  naming, aliases, cachegedrag en adapter-sync.
+- `leclause-skills` remains the existing public source for users.
+- `laicluse-agent-tools` is the new public home for multi-agent-compatible
+  successors.
+- `how-plugins-work` and git-discipline may temporarily exist in multiple
+  places. That is migration duplication, not a DRY problem.
+- The new canonical plugin name for git-discipline is
+  `git-discipline@laicluse-agent-tools`; the legacy public name
+  `gitgit@leclause` stays in place until the old marketplace can carry a
+  plugin-specific migration stub.
+- Migration status belongs here and in package-specific changelogs or stubs,
+  not in `how-plugins-work`. That skill documents plugin mechanics only:
+  naming, aliases, cache behavior, and adapter sync.
 
-## Voor bestaande gebruikers
+## For Existing Users
 
-Installeer de nieuwe marketplace naast de oude:
+Install the new marketplace alongside the old one:
 
 ```bash
 claude plugins marketplace add epologee/laicluse-agent-tools
 ```
 
-Marketplace aliases zijn installatie-identiteiten; `@leclause` wordt niet
-vanzelf `@laicluse-agent-tools`.
+Marketplace aliases are installation identities; `@leclause` does not become
+`@laicluse-agent-tools` automatically.
 
-Wanneer een plugin verhuist, blijft in de oude marketplace minstens een
-migratie-stub achter die uitlegt welke oude install weg kan en welke nieuwe
-install ervoor terugkomt. Pas daarna mag de echte oude plugin verdwijnen.
+When a plugin moves, the old marketplace keeps at least one migration stub that
+explains which legacy install can be removed and which new install replaces it.
+Only then may the real legacy plugin disappear.
 
-## Voor agents
+## For Agents
 
-Werk plugin voor plugin. Houd Claude metadata als bron en genereer Codex
-adapters met `bin/plugin-adapters`. Houd runtime-state onder
+Work plugin by plugin. Keep Claude metadata as the source and generate Codex
+adapters with `bin/plugin-adapters`. Keep runtime state under
 `${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}`.

@@ -1,56 +1,57 @@
 # laicluse-agent-tools marketplace
 
-Publieke l'Aicluse Agent Tools marketplace. Deze repo bevat de publieke,
-deelbare plugins, skills, hooks en agent-adapters.
+Public l'Aicluse Agent Tools marketplace. This repository contains the public,
+shareable plugins, skills, hooks, and agent adapters.
 
 ## Multi-agent marketplace
 
-Dit is geen Claude-only en geen Codex-only repository. `packages/<plugin>/` is
-de canonical source voor elke plugin; Claude en Codex krijgen daaruit hun eigen
-runtime vorm via generated adapters. Nieuwe tooling hoort dus standaard
-multi-agent ontworpen te worden, of expliciet agent-specifiek gemarkeerd te
-worden met de suffix-conventie hieronder. Houd rekening met toekomstige agents
-naast Claude en Codex.
+This is neither a Claude-only nor a Codex-only repository.
+`packages/<plugin>/` is the canonical source for each plugin; Claude and Codex
+receive their own runtime form through generated adapters. New tooling should
+therefore be designed as multi-agent by default, or be marked explicitly as
+agent-specific with the suffix convention below. Account for future agents
+beyond Claude and Codex.
 
-## Schrijfstijl
+## Writing Style
 
-Taal: Nederlands voor user-facing projectdocumentatie waar die stijl al past.
-Code, manifests en commit messages blijven Engels. Vaktermen, package-namen en
-framework-namen blijven onvertaald binnen Nederlandse zinnen.
+Language: English for all repository documentation and public skill text.
+Code, manifests, and commit messages also stay English. Keep package names,
+framework names, and literal trigger phrases unchanged when they are part of a
+skill's matching behavior.
 
-## Lokale storage
+## Local Storage
 
-Alle eigen runtime-state van l'Aicluse Agent Tools projecten gebruikt
-`${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}` als root. Maak subdirectories
-op componentnaam, bijvoorbeeld `~/.laicluse-agent/circus/`, niet op
-marketplace- of repositorynaam (`toolbox`, `public`, `private`) en niet onder
-nieuwe `~/.laicluse-*` of `~/.leclause-*` roots.
+All first-party runtime state for l'Aicluse Agent Tools projects uses
+`${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}` as its root. Create
+subdirectories by component name, for example `~/.laicluse-agent/circus/`, not
+by marketplace or repository name (`toolbox`, `public`, `private`) and not
+under new `~/.laicluse-*` or `~/.leclause-*` roots.
 
-Agent-harness caches die Claude of Codex zelf beheert
-(`~/.claude/plugins/cache`, `~/.codex/plugins/cache`, install indexes) blijven
-waar de harness ze verwacht; schrijf daar geen first-party state tenzij de
-harness API dat afdwingt. Bij legacy-state: lees/migreer uit oude paden,
-schrijf daarna alleen naar `~/.laicluse-agent`.
+Agent-harness caches managed by Claude or Codex themselves
+(`~/.claude/plugins/cache`, `~/.codex/plugins/cache`, install indexes) stay
+where the harness expects them. Do not write first-party state there unless the
+harness API requires it. For legacy state: read or migrate from old paths, then
+write only to `~/.laicluse-agent`.
 
-## Migratiestatus
+## Migration Status
 
-Deze repo is de publieke opvolger van geselecteerde tools uit
-`epologee/leclause-skills`. Publiceer alleen changes die externe gebruikers
-kunnen volgen met een werkende install- of migratieroute.
+This repository is the public successor for selected tools from
+`epologee/leclause-skills`. Publish only changes that external users can follow
+with a working install or migration route.
 
-Tijdens de overgang mogen `how-plugins-work` en git-discipline tijdelijk op
-meerdere plekken bestaan: oud publiek (`leclause-skills`) en nieuw publiek
-(`laicluse-agent-tools`). Dat is bewuste migratieduplicatie, geen
-DRY-findingslijst. Verwijder geen oude kopie zonder werkende migratie-stub voor
-bestaande gebruikers. De publieke canonical plek wordt deze repo.
+During the transition, `how-plugins-work` and git-discipline may temporarily
+exist in multiple places: legacy public (`leclause-skills`) and new public
+(`laicluse-agent-tools`). That is intentional migration duplication, not a DRY
+findings list. Do not remove an old copy without a working migration stub for
+existing users. This repository becomes the public canonical home.
 
-## Plugin-conventies
+## Plugin Conventions
 
-- Skills staan onder `packages/<plugin>/skills/<skill>/`.
-- Gebruik `SKILL.md` alleen als de skill echt multi-agent-compatible is.
-- Gebruik `SKILL.claude.md` én `SKILL.codex.md` wanneer de workflow per agent
-  verschilt; `bin/plugin-adapters build .` materialiseert daaruit de runtime
+- Skills live under `packages/<plugin>/skills/<skill>/`.
+- Use `SKILL.md` only when the skill is truly multi-agent-compatible.
+- Use both `SKILL.claude.md` and `SKILL.codex.md` when the workflow differs per
+  agent; `bin/plugin-adapters build .` materializes the runtime
   `SKILL.md` targets.
-- Claude metadata blijft source; Codex manifests en `.agents/plugins/` zijn
-  gegenereerde adapters.
-- Geen symlinks; dezelfde layout moet op macOS, Linux en Windows werken.
+- Claude metadata remains the source; Codex manifests and `.agents/plugins/`
+  are generated adapters.
+- No symlinks; the same layout must work on macOS, Linux, and Windows.

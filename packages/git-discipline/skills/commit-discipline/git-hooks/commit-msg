@@ -142,7 +142,7 @@ opt_out_list="docs-only, config-only, migration-only, spec-only, chore-deps, rev
   printf 'Expected body format:\n\n%s\n\n' "$example"
   printf 'Opt-out tokens for Slice: %s\n\n' "$opt_out_list"
   printf 'No magic-comment bypass exists. Use git commit --no-verify\n'
-  printf '(logged to ${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}/git-discipline/git-discipline-no-verify.log) as a noodknop.\n'
+  printf '(logged to ${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}/git-discipline/git-discipline-no-verify.log) as an emergency bypass.\n'
 } >&2
 
 exit 1

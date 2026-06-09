@@ -107,7 +107,7 @@ regex in `commit-subject.sh`.
   this automatically when the staged diff has at most 1 file and at most 5
   insertions; the git-native commit-msg hook re-derives it from the staged
   diff every run and ignores any exported value. There is no manual override
-  short of `git commit --no-verify` (audit-logged noodknop).
+  short of `git commit --no-verify` (audit-logged emergency bypass).
 
 ### Rule-rotation expectations
 
@@ -619,7 +619,8 @@ Set GIT_DISCIPLINE_ALLOW_WIP_PUSH=1 or add '# allow-wip-push' to bypass.
 The discipline is strict by default for every commit. There is no
 magic-comment opt-out (`# vsd-skip` is rejected) and no env-var ramp
 (the former `GIT_DISCIPLINE_AUTONOMOUS=1` is gone; its strict rules apply to
-every commit). The general audit-logged noodknop is `git commit --no-verify`;
+every commit). The general audit-logged emergency bypass is
+`git commit --no-verify`;
 the only purpose-scoped opt-out is the `Discipline: skip due to rebase`
 trailer for commits a rebase carried along (see below).
 
@@ -685,7 +686,7 @@ PreToolUse:Bash layer. The git-native commit-msg hook re-derives the
 trivial flag from the staged diff on every run; an externally exported
 value does not bypass that hook. For trivial-but-larger commits at the
 git-native layer there is no shortcut: write the schema body or use
-`git commit --no-verify` (logged as noodknop).
+`git commit --no-verify` (logged as an emergency bypass).
 
 ## Troubleshooting
 

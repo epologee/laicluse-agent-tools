@@ -13,7 +13,7 @@
 #
 #   Tradeoff: an unrelated parallel commit in another shell could refresh the
 #   trace and mask a --no-verify in this commit. Acceptable: --no-verify is a
-#   bewuste escape, not an attacker we are trying to defeat. The simpler
+#   deliberate escape, not an attacker we are trying to defeat. The simpler
 #   approach beats the racy PID-sentinel for the same audit goal.
 #
 # Always exits 0; this is a logging hook, not a blocker.

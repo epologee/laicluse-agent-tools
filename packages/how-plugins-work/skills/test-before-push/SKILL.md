@@ -2,10 +2,10 @@
 name: test-before-push
 user-invocable: true
 description: >-
-  Canonieke procedure om wijzigingen in een multi-agent plugin-marketplace lokaal
-  uit te rollen naar Claude Code en Codex zonder eerst naar GitHub te pushen.
-  Triggers op /test-before-push, "test dit lokaal", "test deze branch",
-  "installeer in een andere sessie", "check voor de push".
+  Canonical procedure for rolling multi-agent plugin marketplace changes out to
+  Claude Code and Codex locally before pushing to GitHub. Triggers on
+  /test-before-push, "test this locally", "test this branch", "install in a
+  different session", and "check before push".
 ---
 
 # Test before push

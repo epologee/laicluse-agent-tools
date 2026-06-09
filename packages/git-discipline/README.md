@@ -47,8 +47,8 @@ Reference for the schema, examples, escape-hatches, and troubleshooting:
 
 - **commit-all-the-things** inspects `git status` plus `git diff`, groups
   changes by intent (feature, fix, refactor, docs, config), and creates
-  one commit per group. Dutch trigger phrases also fire it: "commit
-  alles", "ruim de working tree op".
+  one commit per group. Trigger phrases include "commit everything",
+  "clean up the working tree", and "commit what's left".
 - **commit-snipe** stages only the files (or hunks) that belong to the
   current conversation's work and leaves the rest untouched. Auto-fires
   on the word "snipe".

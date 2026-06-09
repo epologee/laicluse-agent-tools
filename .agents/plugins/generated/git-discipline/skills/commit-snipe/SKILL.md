@@ -40,7 +40,7 @@ digraph snipe {
 
 ## Rules
 
-- **Invocation IS commit intent.** `/git-discipline:commit-snipe` means "commit now". Do not ask for confirmation, no "wil je dit committen?". The user has already given their intent by invoking the skill.
+- **Invocation IS commit intent.** `/git-discipline:commit-snipe` means "commit now". Do not ask for confirmation. The user has already given their intent by invoking the skill.
 - **When in doubt, do NOT stage.** A file you cannot confidently trace back to the current work does not belong in the commit.
 - **Never `git add .` or `git add -A`.** Always explicit paths or hunks.
 - **Files are an implementation detail.** The snipe might be two lines
@@ -50,14 +50,14 @@ digraph snipe {
 - **No questions about which files.** The conversation context IS the source of truth. You know which changes you touched.
 - **Count generated files.** If you edited an SVG and generated PNGs from it, the PNGs belong with it.
 - **Multiple logical units = multiple commits.** If the current work consists of independent steps, snipe per step.
-- **Snipe pre-existing changes too.** When the user explicitly says "wat er nog staat" or similar, commit all uncommitted changes. Group them into logical commits, even when they are not from the current session.
+- **Snipe pre-existing changes too.** When the user explicitly says "what is still there" or similar, commit all uncommitted changes. Group them into logical commits, even when they are not from the current session.
 
 ## Anti-patterns
 
 | Wrong | Correct |
 |------|---------|
 | Stage everything because the user said "commit" | Only files from the current work |
-| Vragen "welke bestanden wil je committen?" | Determine yourself from conversation context |
+| Ask "which files do you want to commit?" | Determine yourself from conversation context |
 | Forget files you generated indirectly | Include all output: generated, compiled, derived files |
 | `git add -A` and then unstage what does not belong | `git add` with explicit paths |
 | Bring along unmodified files "by accident" | `git diff --cached --stat` verifies what is actually staged |
