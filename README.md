@@ -3,8 +3,10 @@
 Publieke, deelbare agent tooling voor Claude Code, Codex en toekomstige
 coding-agents.
 
-Deze repo is voorlopig local-only. Maak geen remote, push niet, en publiceer
-niets totdat de migratie voor externe gebruikers actionable is.
+Deze repo is de publieke opvolger van geselecteerde tools uit
+`epologee/leclause-skills`. De migratie gebeurt plugin voor plugin: installeer
+eerst de nieuwe marketplace, vervang daarna alleen de plugins die hieronder
+staan, en laat `@leclause` staan zolang je nog oude plugins gebruikt.
 
 ## Eerste slice
 
@@ -17,22 +19,33 @@ van oude tooling naar de nieuwe multi-agent plek.
 Tijdens de migratie blijft `epologee/leclause-skills` de bestaande publieke
 marketplace. Bestaande gebruikers hoeven nu niets te deinstalleren of te
 herinstalleren. Een rename van `@leclause` naar `@laicluse-agent-tools` gebeurt
-niet automatisch; beide aliases kunnen naast elkaar bestaan zodra deze repo
-later wel extern installeerbaar is. Oude plugins verdwijnen pas nadat er per
-verwijderde plugin een werkende migratie-stub is.
+niet automatisch; beide aliases kunnen naast elkaar bestaan. Oude plugins
+verdwijnen pas nadat er per verwijderde plugin een werkende migratie-stub is.
 
-## Lokale installatie
+## Installatie
 
-Alleen voor lokale ontwikkeling:
+Claude Code:
+
+```bash
+claude plugins marketplace add epologee/laicluse-agent-tools
+claude plugins install how-plugins-work@laicluse-agent-tools
+claude plugins install git-discipline@laicluse-agent-tools
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add epologee/laicluse-agent-tools
+codex plugin add how-plugins-work@laicluse-agent-tools
+codex plugin add git-discipline@laicluse-agent-tools
+```
+
+Voor lokale ontwikkeling kun je de marketplace naar de working copy laten
+wijzen:
 
 ```bash
 claude plugins marketplace add ./
-claude plugins install how-plugins-work@laicluse-agent-tools
-claude plugins install git-discipline@laicluse-agent-tools
-
 codex plugin marketplace add ./
-codex plugin add how-plugins-work@laicluse-agent-tools
-codex plugin add git-discipline@laicluse-agent-tools
 ```
 
 ## Plumbing

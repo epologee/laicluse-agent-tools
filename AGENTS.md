@@ -23,29 +23,26 @@ framework-namen blijven onvertaald binnen Nederlandse zinnen.
 Alle eigen runtime-state van l'Aicluse Agent Tools projecten gebruikt
 `${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}` als root. Maak subdirectories
 op componentnaam, bijvoorbeeld `~/.laicluse-agent/circus/`, niet op
-marketplace/repo-privacy (`toolbox`, `private`, `laicluse-agent-tools-private`)
-en niet onder nieuwe `~/.laicluse-*` of `~/.leclause-*` roots.
+marketplace- of repositorynaam (`toolbox`, `public`, `private`) en niet onder
+nieuwe `~/.laicluse-*` of `~/.leclause-*` roots.
 
-Deze regel geldt voor code en docs in zowel `laicluse-agent-tools` als
-`laicluse-agent-tools-private`. Agent-harness caches die Claude of Codex zelf
-beheert (`~/.claude/plugins/cache`, `~/.codex/plugins/cache`, install indexes)
-blijven waar de harness ze verwacht; schrijf daar geen first-party state tenzij
-de harness API dat afdwingt. Bij legacy-state: lees/migreer uit oude paden,
+Agent-harness caches die Claude of Codex zelf beheert
+(`~/.claude/plugins/cache`, `~/.codex/plugins/cache`, install indexes) blijven
+waar de harness ze verwacht; schrijf daar geen first-party state tenzij de
+harness API dat afdwingt. Bij legacy-state: lees/migreer uit oude paden,
 schrijf daarna alleen naar `~/.laicluse-agent`.
 
 ## Migratiestatus
 
-Deze repo is voorlopig local-only. Maak geen remote, push niet, en publiceer
-niets totdat externe migratie-instructies actionable zijn.
+Deze repo is de publieke opvolger van geselecteerde tools uit
+`epologee/leclause-skills`. Publiceer alleen changes die externe gebruikers
+kunnen volgen met een werkende install- of migratieroute.
 
 Tijdens de overgang mogen `how-plugins-work` en git-discipline tijdelijk op
-meerdere plekken bestaan: oud publiek (`leclause-skills`), nieuw publiek
-(`laicluse-agent-tools`) en waar nodig de private werkbank
-(`laicluse-agent-tools-private`). Dat is bewuste migratieduplicatie, geen
-DRY-findingslijst. Verwijder geen oude kopie zonder werkende migratie-stub
-voor bestaande gebruikers. De uiteindelijke publieke canonical plek wordt deze
-repo; private tooling blijft alleen in `laicluse-agent-tools-private` als het
-operator-specifiek is.
+meerdere plekken bestaan: oud publiek (`leclause-skills`) en nieuw publiek
+(`laicluse-agent-tools`). Dat is bewuste migratieduplicatie, geen
+DRY-findingslijst. Verwijder geen oude kopie zonder werkende migratie-stub voor
+bestaande gebruikers. De publieke canonical plek wordt deze repo.
 
 ## Plugin-conventies
 
