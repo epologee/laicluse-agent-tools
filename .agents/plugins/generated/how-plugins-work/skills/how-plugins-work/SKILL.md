@@ -321,6 +321,30 @@ The `plugins[*].source` field in `marketplace.json` passes through two layers, a
 
 **Diagnostic signal chain.** When `claude plugin marketplace add` succeeds but `claude plugin marketplace list` does not show the marketplace and install fails with "Plugin not found in marketplace", `source` is the first thing to verify. Schema pass does not imply runtime pass.
 
+## Deprecating and removing a plugin (tombstone)
+
+There is no native "deprecate" or "remove" mechanism for a single plugin. `marketplace.json` has no `deprecated`, `removed`, or tombstone field; the entry schema is `source`, `category`, `tags`, `strict`, `version` plus manifest fields. Deleting a plugin's entry does **not** uninstall it for anyone who already has it.
+
+What deleting the entry actually does (Claude Code 2.x, plus open issues anthropics/claude-code#17061, #37865, #9537, #23839):
+
+- The plugin disappears from the catalog, so fresh installs can no longer find it.
+- Existing installs are **orphaned**: `installed_plugins.json` keeps `<plugin>@<marketplace>`, `enabledPlugins` keeps `true`, the cache directory stays, and **its hooks keep firing**. A byte-identical successor installed from another marketplace then double-enforces against the orphan.
+- `claude plugins update <plugin>@<marketplace>` afterwards errors with "Plugin not found in marketplace".
+- The only clean per-plugin removal is the user running `claude plugins uninstall <plugin>@<marketplace>`. `claude plugins marketplace remove <marketplace>` cascades, uninstalling *every* plugin from that marketplace at once, so it is wrong for a one-at-a-time migration.
+
+Because the platform never auto-cleans on entry removal, a clean migration needs a deprecation protocol you build. The **tombstone** is that protocol: instead of hard-deleting, hollow the plugin to a husk that stops behaving and announces its own removal.
+
+Tombstone shape (verified against `gitgit@leclause` moving to `git-discipline@laicluse-agent-tools`):
+
+1. **Strip everything that runs.** Delete `skills/`, all guard/library hooks, `bin/`, and tests. Removing the hooks is what kills any conflict with the successor (the orphaned-hook double-enforcement above). If the source marketplace pairs per-plugin update-broadcast machinery (a changelog plus a helper script) with a sync gate, drop both together so the gate stays quiet.
+2. **Keep one proactive signal.** A skill cannot announce a deprecation, because a skill only surfaces when invoked. The single mechanism that fires unprompted when the plugin loads is a `SessionStart` hook. Ship `hooks/hooks.json` with one `SessionStart` (matcher `startup|resume`) command that prints the uninstall and install lines to stdout, which Claude Code injects as context.
+3. **Rewrite the descriptions.** `plugin.json` and the `marketplace.json` entry both lead with `DEPRECATED` and the exact `claude plugins uninstall` / install commands, so the husk reads as a tombstone in `/plugin` and in plugin list.
+4. **Keep the marketplace entry alive.** This is the point: the entry must stay so that the next `claude plugins update <plugin>@<marketplace>` actually delivers the stripped husk (hooks gone) and the SessionStart notice. Delete the entry and the consumer is back to a silent orphan.
+
+Division of labour with a marketplace-level announcement: a marketplace-wide changelog or news channel carries the migration story (pull-based, read on demand), while the per-plugin tombstone is the proactive push that nags a still-installed copy until the user removes it.
+
+Precondition before hollowing out a **public** plugin: the successor marketplace must already be public and carry actionable migration instructions for external users. Hollowing a plugin that points users at a marketplace they cannot add strands them. Verify with `gh repo view <owner>/<successor> --json visibility` and confirm the successor plugin is registered in its `marketplace.json` before tombstoning.
+
 ## Reading env vars from settings.json
 
 The `env` section of `~/.claude/settings.json` exports variables to child bash processes that Claude Code spawns. Those values are **not visible in Claude's conversation context**. A skill that wants to condition behavior on an env var must query the value via bash. Claude does not "know" the value on its own and will guess.
