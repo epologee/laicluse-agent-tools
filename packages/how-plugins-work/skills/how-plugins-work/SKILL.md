@@ -347,6 +347,8 @@ Division of labour with a marketplace-level announcement: a marketplace-wide cha
 
 Precondition before hollowing out a **public** plugin: the successor marketplace must already be public and carry actionable migration instructions for external users. Hollowing a plugin that points users at a marketplace they cannot add strands them. Verify with `gh repo view <owner>/<successor> --json visibility` and confirm the successor plugin is registered in its `marketplace.json` before tombstoning.
 
+Scope: tombstones exist for consumers you cannot see. A single-user, local-only marketplace has exactly one consumer, so a plain entry-plus-package delete combined with a local `claude plugins uninstall` is already the complete removal; building a husk there is ceremony without an audience.
+
 ## Reading env vars from settings.json
 
 The `env` section of `~/.claude/settings.json` exports variables to child bash processes that Claude Code spawns. Those values are **not visible in Claude's conversation context**. A skill that wants to condition behavior on an env var must query the value via bash. Claude does not "know" the value on its own and will guess.
