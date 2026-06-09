@@ -126,12 +126,14 @@ generate_into() {
       codex_source="./.agents/plugins/generated/$name"
       target_dir="$out_root/.agents/plugins/generated/$name"
       rm -rf "$target_dir"
+      rm -rf "$out_root/${source#./}/.codex-plugin"
       mkdir -p "$target_dir/.codex-plugin"
       copy_sanitized_skills "$plugin_dir" "$target_dir"
       codex_plugin_payload "$manifest" "$name" > "$target_dir/.codex-plugin/plugin.json"
     else
       codex_source="$source"
       target_dir="$out_root/${source#./}/.codex-plugin"
+      rm -rf "$out_root/.agents/plugins/generated/$name"
       mkdir -p "$target_dir"
       codex_plugin_payload "$manifest" "$name" > "$target_dir/plugin.json"
     fi
@@ -163,6 +165,14 @@ expected_files() {
   } | sort -u
 }
 
+actual_files() {
+  local repo="$1"
+  {
+    find "$repo/.agents" -type f 2>/dev/null
+    find "$repo" -path "*/.codex-plugin/plugin.json" -type f 2>/dev/null
+  } | sort -u
+}
+
 cmd_build() {
   local repo
   repo="$(repo_root "${1:-$PWD}")"
@@ -171,11 +181,15 @@ cmd_build() {
 }
 
 cmd_check() {
-  local repo tmp expected rel rc=0
+  local repo tmp expected rel rc=0 expected_rel actual_rel unexpected
   repo="$(repo_root "${1:-$PWD}")"
   tmp="$(mktemp -d)"
   trap "rm -rf '$tmp'" EXIT
   generate_into "$repo" "$tmp"
+  expected_rel="$tmp/expected.txt"
+  actual_rel="$tmp/actual.txt"
+  expected_files "$tmp" | sed "s#^$tmp/##" > "$expected_rel"
+  actual_files "$repo" | sed "s#^$repo/##" > "$actual_rel"
 
   while IFS= read -r expected; do
     rel="${expected#$tmp/}"
@@ -189,6 +203,11 @@ cmd_check() {
       rc=1
     fi
   done < <(expected_files "$tmp")
+  while IFS= read -r unexpected; do
+    [ -n "$unexpected" ] || continue
+    printf 'DRIFT  %s is an unexpected generated adapter target\n' "$unexpected"
+    rc=1
+  done < <(comm -13 "$expected_rel" "$actual_rel")
   return "$rc"
 }
 
