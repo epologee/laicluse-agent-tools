@@ -16,6 +16,14 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 Version numbers may therefore be non-contiguous (an internal refactor bumps
 the version without producing an entry here).
 
+## [v2.0.2]
+
+### Breaking
+
+- **First public l'Aicluse release.** Install this plugin as
+  `git-discipline@laicluse-agent-tools`; it replaces legacy `gitgit@leclause`
+  for migrated workflows.
+
 ## [v1.0.1]
 
 ### Breaking

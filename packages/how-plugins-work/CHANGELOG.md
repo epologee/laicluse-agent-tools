@@ -18,6 +18,13 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 The helper writes the sentinel only when stdout is non-empty, so a CHANGELOG
 without a `## [vX.Y.Z]` section stays silent on every update.
 
+## [v2.0.5]
+
+### Changed
+
+- **First public l'Aicluse release.** `how-plugins-work` now ships from
+  `how-plugins-work@laicluse-agent-tools` with major version 2.
+
 ## [v1.0.4]
 
 ### Added

@@ -2,7 +2,7 @@
 #
 # plugin-versions: enforce per-plugin semver based on commit count.
 #
-# Each plugin in .claude-plugin/marketplace.json gets version 1.0.{N}
+# Each plugin in .claude-plugin/marketplace.json gets version 2.0.{N}
 # where N is the number of commits touching packages/<name>/ or skills/<name>/.
 #
 # Modes:
@@ -17,6 +17,7 @@ set -eu
 cd "$(git rev-parse --show-toplevel)"
 
 MARKETPLACE_FILE=".claude-plugin/marketplace.json"
+VERSION_PREFIX="2.0"
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 {--check|--write|--bootstrap|--staged}" >&2
@@ -167,7 +168,7 @@ mode_check() {
   local drift=0
   local name expected actual plugin_desc market_desc
   while IFS= read -r name; do
-    expected="1.0.$(count_commits "$name")"
+    expected="$VERSION_PREFIX.$(count_commits "$name")"
     actual=$(current_version "$name")
     if [ "$expected" != "$actual" ]; then
       echo "VERSION DRIFT: $name expected $expected, got $actual" >&2
@@ -186,7 +187,7 @@ mode_check() {
 mode_write() {
   local name version
   while IFS= read -r name; do
-    version="1.0.$(count_commits "$name")"
+    version="$VERSION_PREFIX.$(count_commits "$name")"
     if [ "$(current_version "$name")" != "$version" ]; then
       write_plugin_version "$name" "$version"
       echo "Wrote $name $version"
@@ -202,7 +203,7 @@ mode_bootstrap() {
   local name count version
   while IFS= read -r name; do
     count=$(count_commits "$name")
-    version="1.0.$((count + 1))"
+    version="$VERSION_PREFIX.$((count + 1))"
     write_plugin_version "$name" "$version"
     sync_marketplace_description "$name"
     echo "Bootstrapped $name $version"
@@ -228,7 +229,7 @@ mode_staged() {
     fi
     [ $dirty -eq 1 ] || continue
     count=$(count_commits "$name")
-    version="1.0.$((count + delta))"
+    version="$VERSION_PREFIX.$((count + delta))"
     if [ "$(current_version "$name")" != "$version" ]; then
       write_plugin_version "$name" "$version"
       git add "packages/$name/.claude-plugin/plugin.json"
