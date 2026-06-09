@@ -29,7 +29,7 @@ updates when something changes.
 
 ## Installation
 
-Local-only during the l'Aicluse migration:
+Local development install:
 
 ```bash
 claude plugins install how-plugins-work@laicluse-agent-tools

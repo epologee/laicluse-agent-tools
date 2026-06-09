@@ -18,13 +18,20 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 The helper writes the sentinel only when stdout is non-empty, so a CHANGELOG
 without a `## [vX.Y.Z]` section stays silent on every update.
 
+## [v1.0.3]
+
+### Changed
+
+- **Project status moved out of the mechanics reference.** `how-plugins-work`
+  now stays focused on plugin naming, marketplace aliases, adapter sync, caches,
+  and local install mechanics; repo transition state belongs in repo-level docs.
+
 ## [v1.0.1]
 
 ### Changed
 
-- **l'Aicluse migration baseline.** The skill now covers both Claude Code and
-  Codex local marketplace installs, records the temporary coexistence of
-  `@leclause` and `@laicluse-agent-tools`, and stores broadcast state under
+- **Multi-agent local marketplace baseline.** The skill now covers both Claude
+  Code and Codex local marketplace installs, and stores broadcast state under
   `${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}`.
 
 ## [v1.0.31]

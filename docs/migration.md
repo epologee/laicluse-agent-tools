@@ -20,6 +20,9 @@ Tot die tijd:
 - De lokale nieuwe canonical plugin-naam voor git-discipline is
   `git-discipline@laicluse-agent-tools`; de oude publieke naam
   `gitgit@leclause` blijft legacy totdat externe instructies actionable zijn.
+- Migratiestatus hoort hier en in package-specifieke changelogs/stubs, niet in
+  `how-plugins-work`. Die skill documenteert alleen plugin-mechanics zoals
+  naming, aliases, cachegedrag en adapter-sync.
 
 ## Voor bestaande gebruikers
 

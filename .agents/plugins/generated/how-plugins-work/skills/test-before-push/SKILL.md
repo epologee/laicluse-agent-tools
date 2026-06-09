@@ -82,9 +82,8 @@ working-tree edits. For Codex, start a fresh session after `codex plugin add`.
 
 ## Revert
 
-For local-only marketplaces such as the first `laicluse-agent-tools` slice,
-there is no remote revert. Leave the local marketplace configured until the
-operator explicitly changes the install source.
+For local-only marketplaces, there is no remote revert. Leave the local
+marketplace configured until the operator explicitly changes the install source.
 
 When a repo later has a real remote and the tested commit has been pushed,
 re-point the alias to the remote source without removing the marketplace:
