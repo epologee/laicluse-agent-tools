@@ -11,6 +11,11 @@
       "name": "how-plugins-work",
       "description": "Explains plugin naming, skill resolution, Claude/Codex adapter sync, marketplace aliases, runtime caches, and the plugin:skill invocation pattern in practice. During the l'Aicluse migration it records how @leclause and @laicluse-agent-tools coexist, and ships a local test-before-push workflow for both Claude and Codex.",
       "source": "./packages/how-plugins-work"
+    },
+    {
+      "name": "git-discipline",
+      "description": "Multi-agent git discipline bundle: reusable commit/rebase/merge skills, repo-aware push policy, Claude PreToolUse guards, Codex-ready skill adapters, and git-native hooks for direct CLI commits.",
+      "source": "./packages/git-discipline"
     }
   ]
 }

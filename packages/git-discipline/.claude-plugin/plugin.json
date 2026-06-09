@@ -1,0 +1,5 @@
+{
+  "name": "git-discipline",
+  "description": "Multi-agent git discipline bundle: reusable commit/rebase/merge skills, repo-aware push policy, Claude PreToolUse guards, Codex-ready skill adapters, and git-native hooks for direct CLI commits.",
+  "version": "1.0.1"
+}

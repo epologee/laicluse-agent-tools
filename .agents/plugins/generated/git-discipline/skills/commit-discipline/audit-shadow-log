@@ -1,0 +1,207 @@
+#!/bin/bash
+# Idempotent audit-helper for ${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}/git-discipline/git-discipline-shadow.log.
+# Reads the log, prints a per-commit summary with optional --since=<date>
+# and --branch=<name> filters, plus a labeling-aid mode (--label) that
+# prompts for true/false labels per event and writes them to a sidecar file.
+#
+# Usage:
+#   audit-shadow-log                        # print summary table
+#   audit-shadow-log --since=2026-01-01     # filter by ISO date prefix
+#   audit-shadow-log --branch=main          # filter by branch name
+#   audit-shadow-log --label                # interactive labeling mode
+#
+# Log line format (written by commit-body.sh):
+#   <ISO-timestamp>|<sha-or-staging>|<branch>|<violation-code>|<subject-first-50>
+#
+# Note: commit-body.sh sanitises branch and subject by replacing literal '|'
+# with '-' before writing, so field-splitting on '|' is always safe.
+
+set -euo pipefail
+
+SHADOW_LOG="${GIT_DISCIPLINE_SHADOW_LOG:-${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}/git-discipline/git-discipline-shadow.log}"
+LABELS_LOG="${GIT_DISCIPLINE_SHADOW_LOG:-${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}/git-discipline/git-discipline-shadow.log}-labels.log"
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+
+since_filter=""
+branch_filter=""
+label_mode=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --since=*)
+      since_filter="${arg#--since=}"
+      ;;
+    --branch=*)
+      branch_filter="${arg#--branch=}"
+      ;;
+    --label)
+      label_mode=1
+      ;;
+    --help|-h)
+      grep '^#' "$0" | head -20 | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$arg" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
+# Guard: log file must exist
+# ---------------------------------------------------------------------------
+
+if [[ ! -f "$SHADOW_LOG" ]]; then
+  printf 'Shadow log not found: %s\n' "$SHADOW_LOG"
+  printf 'No commits have triggered the commit-body guard yet.\n'
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Read and filter log lines
+# ---------------------------------------------------------------------------
+
+# filtered_lines collects lines that pass all active filters.
+filtered_lines=()
+
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+
+  ts=$(printf '%s' "$line" | cut -d'|' -f1)
+  branch=$(printf '%s' "$line" | cut -d'|' -f3)
+
+  if [[ -n "$since_filter" ]] && [[ "$ts" < "$since_filter" ]]; then
+    continue
+  fi
+
+  if [[ -n "$branch_filter" ]] && [[ "$branch" != "$branch_filter" ]]; then
+    continue
+  fi
+
+  filtered_lines+=("$line")
+done < <(sort "$SHADOW_LOG")
+
+if [[ "${#filtered_lines[@]}" -eq 0 ]]; then
+  printf 'No log entries match the given filters.\n'
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Summary table mode (default)
+# ---------------------------------------------------------------------------
+
+if [[ "$label_mode" -eq 0 ]]; then
+  printf '%-24s  %-10s  %-20s  %-30s  %s\n' \
+    "TIMESTAMP" "SHA" "BRANCH" "CODE" "SUBJECT"
+  printf '%s\n' "$(printf '%0.s-' {1..100})"
+
+  for line in "${filtered_lines[@]}"; do
+    ts=$(printf '%s'     "$line" | cut -d'|' -f1)
+    sha=$(printf '%s'    "$line" | cut -d'|' -f2)
+    branch=$(printf '%s' "$line" | cut -d'|' -f3)
+    code=$(printf '%s'   "$line" | cut -d'|' -f4)
+    subj=$(printf '%s'   "$line" | cut -d'|' -f5)
+    printf '%-24s  %-10s  %-20s  %-30s  %s\n' \
+      "$ts" "$sha" "$branch" "$code" "$subj"
+  done
+
+  printf '\nTotal events: %d\n' "${#filtered_lines[@]}"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Labeling mode
+# ---------------------------------------------------------------------------
+
+# Load already-labeled lines from the sidecar to skip duplicates.
+declare -A already_labeled
+
+if [[ -f "$LABELS_LOG" ]]; then
+  while IFS= read -r labeled_line; do
+    [[ -z "$labeled_line" ]] && continue
+    # Sidecar format: <original-pipe-delimited-fields>|<label>
+    # The original line is everything except the last field.
+    original=$(printf '%s' "$labeled_line" | rev | cut -d'|' -f2- | rev)
+    already_labeled["$original"]=1
+  done < "$LABELS_LOG"
+fi
+
+true_count=0
+false_count=0
+skipped_count=0
+
+for line in "${filtered_lines[@]}"; do
+  if [[ -n "${already_labeled[$line]+_}" ]]; then
+    skipped_count=$((skipped_count + 1))
+    continue
+  fi
+
+  ts=$(printf '%s'     "$line" | cut -d'|' -f1)
+  sha=$(printf '%s'    "$line" | cut -d'|' -f2)
+  branch=$(printf '%s' "$line" | cut -d'|' -f3)
+  code=$(printf '%s'   "$line" | cut -d'|' -f4)
+  subj=$(printf '%s'   "$line" | cut -d'|' -f5)
+
+  printf '\n'
+  printf 'Timestamp : %s\n' "$ts"
+  printf 'SHA       : %s\n' "$sha"
+  printf 'Branch    : %s\n' "$branch"
+  printf 'Violation : %s\n' "$code"
+  printf 'Subject   : %s\n' "$subj"
+  printf 'Was this a TRUE positive (the warning was correct)? [t=true / f=false / s=skip / q=quit]: '
+
+  read -r answer </dev/tty
+  case "$answer" in
+    t|T|true|yes)
+      printf '%s|true\n' "$line" >> "$LABELS_LOG"
+      true_count=$((true_count + 1))
+      ;;
+    f|F|false|no)
+      printf '%s|false\n' "$line" >> "$LABELS_LOG"
+      false_count=$((false_count + 1))
+      ;;
+    s|S|skip)
+      skipped_count=$((skipped_count + 1))
+      ;;
+    q|Q|quit)
+      printf 'Quitting.\n'
+      break
+      ;;
+    *)
+      printf 'Unrecognised input; skipping.\n'
+      skipped_count=$((skipped_count + 1))
+      ;;
+  esac
+done
+
+labeled_total=$((true_count + false_count))
+printf '\n'
+printf 'Labeled this session: %d (%d true, %d false), %d skipped\n' \
+  "$labeled_total" "$true_count" "$false_count" "$skipped_count"
+
+# Compute overall FP rate across all labels in the sidecar.
+if [[ -f "$LABELS_LOG" ]]; then
+  all_true=0
+  all_false=0
+  while IFS= read -r lline; do
+    [[ -z "$lline" ]] && continue
+    label_val=$(printf '%s' "$lline" | rev | cut -d'|' -f1 | rev)
+    if [[ "$label_val" = "true" ]]; then
+      all_true=$((all_true + 1))
+    elif [[ "$label_val" = "false" ]]; then
+      all_false=$((all_false + 1))
+    fi
+  done < "$LABELS_LOG"
+
+  all_total=$((all_true + all_false))
+  if [[ "$all_total" -gt 0 ]]; then
+    # Integer percentage (bash arithmetic).
+    fp_pct=$(( (all_false * 100) / all_total ))
+    printf 'Overall FP rate (all labeled events): %d/%d = %d%%\n' \
+      "$all_false" "$all_total" "$fp_pct"
+  fi
+fi

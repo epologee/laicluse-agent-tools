@@ -1,0 +1,61 @@
+#!/bin/bash
+# packages/git-discipline/skills/commit-discipline/git-hooks/post-commit
+#
+# git-native post-commit hook. Detects whether the previous commit-msg hook
+# actually ran. If it did NOT (i.e. --no-verify was used), logs the bypass
+# to ${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}/git-discipline/git-discipline-no-verify.log so the operator can audit later.
+#
+# Detection mechanism (chosen over per-PID sentinels):
+#   commit-msg appends a line "<unix-ts>|<pid>" to
+#   ${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}/git-discipline/.git-discipline-commit-msg-trace.log at the start of its run.
+#   post-commit reads the most recent line. If the timestamp is within the
+#   last 30 seconds, the hook ran. If absent or older, --no-verify was used.
+#
+#   Tradeoff: an unrelated parallel commit in another shell could refresh the
+#   trace and mask a --no-verify in this commit. Acceptable: --no-verify is a
+#   bewuste escape, not an attacker we are trying to defeat. The simpler
+#   approach beats the racy PID-sentinel for the same audit goal.
+#
+# Always exits 0; this is a logging hook, not a blocker.
+
+set -uo pipefail
+
+trace_dir="${LAICLUSE_AGENT_HOME:-$HOME/.laicluse-agent}/git-discipline"
+trace_log="$trace_dir/.git-discipline-commit-msg-trace.log"
+no_verify_log="$trace_dir/git-discipline-no-verify.log"
+
+mkdir -p "$trace_dir" 2>/dev/null || true
+
+now=$(date +%s)
+recent=0
+window=30
+
+if [[ -f "$trace_log" ]]; then
+  last_line=$(tail -1 "$trace_log" 2>/dev/null || true)
+  if [[ -n "$last_line" ]]; then
+    last_ts="${last_line%%|*}"
+    if [[ "$last_ts" =~ ^[0-9]+$ ]]; then
+      delta=$((now - last_ts))
+      if [[ "$delta" -ge 0 && "$delta" -le "$window" ]]; then
+        recent=1
+      fi
+    fi
+  fi
+fi
+
+if [[ "$recent" -eq 1 ]]; then
+  # commit-msg hook ran; nothing to log.
+  exit 0
+fi
+
+# --no-verify path. Capture the just-landed commit metadata.
+# %ae (author email) omitted to minimise PII surface; branch + SHA suffice
+# for audit purposes.
+short_sha=$(git rev-parse --short HEAD 2>/dev/null || printf 'unknown')
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
+ts_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+printf '%s|%s|%s\n' "$ts_iso" "$short_sha" "$branch" \
+  >> "$no_verify_log" 2>/dev/null || true
+
+exit 0

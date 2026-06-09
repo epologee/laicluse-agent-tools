@@ -1,0 +1,100 @@
+#!/bin/bash
+# packages/git-discipline/skills/commit-discipline/git-hooks/pre-push
+#
+# git-native pre-push hook. Reads refspec lines from stdin (git's pre-push
+# protocol: "<local-ref> <local-sha> <remote-ref> <remote-sha>" per line) and
+# blocks the push when any commit in any of the ranges carries a Slice: wip
+# trailer.
+#
+# Mirrors the PreToolUse:Bash guard at hooks/guards/push-wip-gate.sh; both
+# share hooks/lib/wip-gate.sh so the verdict is identical regardless of which
+# path fires first. The Claude-side guard catches Claude pushes; this hook
+# catches everything else (manual git push, scripts, other clients).
+#
+# At install time, /git-discipline:install-hooks substitutes __PLUGIN_INSTALL_PATH__
+# with the absolute path of the active git-discipline plugin install. Same scheme as
+# the commit-msg hook.
+#
+# Bypass paths.
+#   - GIT_DISCIPLINE_ALLOW_WIP_PUSH=1 in the environment of the `git push` invocation.
+#   - There is no magic-comment bypass at the git-native layer; the magic
+#     comment lives in Claude's bash command string, which git never sees.
+#   - --no-verify on `git push` continues to bypass (git's own escape).
+
+set -uo pipefail
+
+PLUGIN_PATH="__PLUGIN_INSTALL_PATH__"
+LIB="$PLUGIN_PATH/hooks/lib/wip-gate.sh"
+DENY_LIB="$PLUGIN_PATH/hooks/lib/deny-check.sh"
+
+# /git-discipline:disable-git lock check. Runs before the wip-gate so a locked repo
+# cannot push at all. Soft-fails (no-op) when the helper is missing.
+if [[ -f "$DENY_LIB" ]]; then
+  # shellcheck disable=SC1090
+  . "$DENY_LIB"
+  deny_check "push"
+fi
+
+if [[ ! -f "$LIB" ]]; then
+  printf 'git-discipline/pre-push: wip-gate lib not found at %s\n' "$LIB" >&2
+  printf '  Re-run /git-discipline:install-hooks to refresh the plugin path, or\n' >&2
+  printf '  use git push --no-verify to bypass this check.\n' >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+. "$LIB"
+
+zero_sha="0000000000000000000000000000000000000000"
+
+all_wip=""
+seen_branch=""
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Skip deletes (local_sha == zero).
+  [[ "$local_sha" = "$zero_sha" ]] && continue
+  [[ -z "$local_sha" ]] && continue
+
+  # Track a representative branch label for logging.
+  if [[ -z "$seen_branch" ]]; then
+    seen_branch="${local_ref#refs/heads/}"
+  fi
+
+  range=$(wip_gate_parse_range "$remote_sha" "$local_sha")
+  [[ -z "$range" ]] && continue
+
+  wip=$(wip_gate_find_wip_commits "$range")
+  if [[ -n "$wip" ]]; then
+    if [[ -z "$all_wip" ]]; then
+      all_wip="$wip"
+    else
+      all_wip="$all_wip"$'\n'"$wip"
+    fi
+  fi
+done
+
+# No wip commits -> let the push through.
+if [[ -z "$all_wip" ]]; then
+  exit 0
+fi
+
+count=$(printf '%s\n' "$all_wip" | grep -c .)
+
+# At the git-native layer, only the env-var bypass applies (the magic-comment
+# bypass lives in the Claude-side bash command string, which git never sees).
+# Pass an empty string for command so wip_gate_should_block ignores comments.
+if ! wip_gate_should_block "" "$count"; then
+  # Bypass active; log and allow.
+  sha_csv=$(printf '%s' "$all_wip" | tr '\n' ',' | sed 's/,$//')
+  wip_gate_log_bypass "$sha_csv" "${seen_branch:-unknown}" "env"
+  exit 0
+fi
+
+{
+  printf '\n'
+  printf '[git-discipline/pre-push] '
+  wip_gate_format_message "$all_wip"
+  printf '\n'
+} >&2
+
+exit 1

@@ -86,7 +86,7 @@ codex_marketplace_entry() {
 
 needs_sanitized_skills() {
   local plugin_dir="$1"
-  grep -R -E -q '^[[:space:]]*(disable[-_]model[-_]invocation|user[-_]invocable):' "$plugin_dir/skills" 2>/dev/null
+  grep -R -E -q '^[[:space:]]*(argument[-_]hint|disable[-_]model[-_]invocation|effort|optional|scope|user[-_]invocable):' "$plugin_dir/skills" 2>/dev/null
 }
 
 copy_sanitized_skills() {
@@ -98,7 +98,7 @@ copy_sanitized_skills() {
     out="$target_dir/$rel"
     mkdir -p "$(dirname "$out")"
     if [ "$(basename "$file")" = "SKILL.md" ]; then
-      awk 'tolower($0) !~ /^[[:space:]]*(disable[-_]model[-_]invocation|user[-_]invocable):/' "$file" > "$out"
+      awk 'tolower($0) !~ /^[[:space:]]*(argument[-_]hint|disable[-_]model[-_]invocation|effort|optional|scope|user[-_]invocable):/' "$file" > "$out"
     else
       cp "$file" "$out"
     fi

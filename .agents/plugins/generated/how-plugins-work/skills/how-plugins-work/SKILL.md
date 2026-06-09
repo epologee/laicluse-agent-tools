@@ -254,7 +254,6 @@ Example (empirically working in the leclause marketplace):
 name: sonnet-max
 description: Generic subagent pinned to Sonnet at maximum effort.
 model: sonnet
-effort: max
 ---
 
 Execute the invoker's prompt and return the result.

@@ -8,9 +8,11 @@ niets totdat de migratie voor externe gebruikers actionable is.
 
 ## Eerste slice
 
-De eerste plugin in deze nieuwe marketplace is `how-plugins-work`. Die legt vast
-hoe plugin-namen, skill-namen, marketplace-aliassen, Claude manifests, Codex
-manifests en runtime caches zich tot elkaar verhouden.
+De eerste plugins in deze nieuwe marketplace zijn `how-plugins-work` en
+`git-discipline`. `how-plugins-work` legt vast hoe plugin-namen, skill-namen,
+marketplace-aliassen, Claude manifests, Codex manifests en runtime caches zich
+tot elkaar verhouden. `git-discipline` is de eerste feature-complete migratie
+van oude tooling naar de nieuwe multi-agent plek.
 
 Tijdens de migratie blijft `epologee/leclause-skills` de bestaande publieke
 marketplace. Bestaande gebruikers hoeven nu niets te deinstalleren of te
@@ -26,9 +28,11 @@ Alleen voor lokale ontwikkeling:
 ```bash
 claude plugins marketplace add ./
 claude plugins install how-plugins-work@laicluse-agent-tools
+claude plugins install git-discipline@laicluse-agent-tools
 
 codex plugin marketplace add ./
 codex plugin add how-plugins-work@laicluse-agent-tools
+codex plugin add git-discipline@laicluse-agent-tools
 ```
 
 ## Plumbing

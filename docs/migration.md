@@ -17,6 +17,9 @@ Tot die tijd:
   remote.
 - `how-plugins-work` en git-discipline mogen tijdelijk op meerdere plekken
   bestaan. Dat is migratieduplicatie, geen DRY-probleem.
+- De lokale nieuwe canonical plugin-naam voor git-discipline is
+  `git-discipline@laicluse-agent-tools`; de oude publieke naam
+  `gitgit@leclause` blijft legacy totdat externe instructies actionable zijn.
 
 ## Voor bestaande gebruikers
 

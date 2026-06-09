@@ -1,0 +1,178 @@
+#!/bin/bash
+# packages/git-discipline/skills/commit-discipline/git-hooks/prepare-commit-msg
+#
+# git-native prepare-commit-msg hook. Pre-fills the commit message file with
+# a structured body template derived from the staged diff.
+#
+# Arguments supplied by git:
+#   $1  commit-msg file path
+#   $2  commit source: "message", "template", "merge", "squash", "commit", or
+#       empty string (normal interactive commit)
+#   $3  commit SHA (only when source is "commit", i.e. --amend)
+#
+# Behaviour by source:
+#   merge, squash  -> do nothing (git already filled the message)
+#   commit         -> do nothing (--amend or programmatic; author owns msg)
+#   message        -> do nothing (operator passed -m; they have their message)
+#   template       -> do nothing (commit.template wins)
+#   (empty)        -> pre-fill with the schema template (normal interactive)
+#
+# At install time, /git-discipline:install-hooks substitutes __PLUGIN_INSTALL_PATH__
+# with the absolute path of the active git-discipline plugin install. The shared
+# classification library is sourced from there.
+
+set -uo pipefail
+
+PLUGIN_PATH="__PLUGIN_INSTALL_PATH__"
+CLASSIFY_LIB="$PLUGIN_PATH/hooks/lib/layer-classify.sh"
+UI_TOUCH_LIB="$PLUGIN_PATH/hooks/lib/ui-touch.sh"
+
+msg_file="${1:-}"
+commit_source="${2:-}"
+# $3 is SHA for amend; unused here.
+
+# ---------------------------------------------------------------------------
+# Guard: only act on normal interactive commits
+# ---------------------------------------------------------------------------
+
+case "$commit_source" in
+  merge|squash|commit|message|template)
+    exit 0
+    ;;
+esac
+
+# Also exit if msg_file is missing.
+if [[ -z "$msg_file" ]] || [[ ! -f "$msg_file" ]]; then
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Source the classification library
+# ---------------------------------------------------------------------------
+
+if [[ ! -f "$CLASSIFY_LIB" ]]; then
+  # Library not found; silently skip template-fill so the commit still works.
+  exit 0
+fi
+
+# shellcheck disable=SC1090
+. "$CLASSIFY_LIB"
+
+# Source the small UI-touch helper so the template fill can decide whether
+# to include a Visual: trailer. Skip silently when missing (older plugin
+# install).
+if [[ -f "$UI_TOUCH_LIB" ]]; then
+  # shellcheck disable=SC1090
+  . "$UI_TOUCH_LIB"
+fi
+
+# ---------------------------------------------------------------------------
+# Classify staged diff
+# ---------------------------------------------------------------------------
+
+staged_paths=$(git diff --cached --name-only 2>/dev/null || true)
+
+layer_summary=$(printf '%s\n' "$staged_paths" | classify_diff)
+slice_suggestion=$(suggest_slice "$layer_summary")
+tests_suggestion=$(printf '%s\n' "$staged_paths" | suggest_tests)
+
+# ---------------------------------------------------------------------------
+# Build the template block
+# ---------------------------------------------------------------------------
+# Trailers are emitted as REAL lines with <placeholder> values so that the
+# validator rejects a commit whose author forgot to fill them in. Comment-only
+# trailers were stripped by git before validation, causing silent failures.
+
+template_block=""
+
+# Decide whether to include a Visual: line. Mirrors the validator's heuristic
+# so what the template suggests matches what the validator will demand on
+# commit-msg execution.
+visual_line=""
+if declare -F _vb_is_ui_touch >/dev/null 2>&1; then
+  if _vb_is_ui_touch; then
+    visual_line=$'\nVisual: <screenshot path or "n/a (reason >= 10 chars)">'
+  fi
+fi
+
+template_block="${template_block}
+$(cat <<EOF
+
+<WHY: replace this with two sentences explaining why this change is needed>
+
+Tests: <comma-separated spec paths that ran green>
+Slice: ${slice_suggestion}
+Red-then-green: <<path> | <path>:<line> # <test-name> | n/a (reason)>${visual_line}
+Verified: <operator-confirmed | <path> | red-then-green | n/a (reason)>
+
+# Replace the placeholder values above before committing.
+# Red-then-green forms: "<path>" (the spec must be in the staged diff),
+#   "<path>:<line> # <test-name>" (line is 1-based; test name must match
+#   a test declaration in the staged blob), or "n/a (rationale >= 10 chars)".
+#   Bare "yes" is no longer accepted. See /git-discipline:commit-discipline.
+# Verified forms: "operator-confirmed" (operator saw the change work this
+#   session), "<path>" (artefact in repo: screenshot/recording/log),
+#   "red-then-green" (covered by the Red-then-green trailer; not allowed
+#   when Red-then-green is n/a), or "n/a (rationale)" with a recognised
+#   category token (see /git-discipline:commit-discipline).
+# Auto-detected from your staged diff:
+#   Layers: ${layer_summary}
+#   Suggested Slice: ${slice_suggestion}
+EOF
+)"
+
+if [[ -n "$tests_suggestion" ]]; then
+  template_block="${template_block}
+#   Suggested Tests: ${tests_suggestion}"
+else
+  template_block="${template_block}
+#   Suggested Tests: (none detected)"
+fi
+
+# ---------------------------------------------------------------------------
+# Inject template into the message file
+# ---------------------------------------------------------------------------
+# git pre-fills the file for a normal interactive commit as:
+#   <empty line for subject>
+#   <blank line>
+#   # Please enter the commit message for your changes. Lines starting
+#   # with '#' will be ignored, and an empty message aborts the commit.
+#   ...
+#
+# Strategy: read the existing content, split on the first git comment block,
+# insert our template between the user-editable area and git's comments.
+
+existing=$(cat "$msg_file")
+
+# Separate user-editable lines from git's own comment lines.
+# Everything up to (not including) the first standalone git comment section.
+# We look for the first line that matches "^# " as the boundary.
+user_part=""
+git_comments=""
+found_git_comments=0
+
+while IFS= read -r line; do
+  if [[ "$found_git_comments" -eq 0 ]] && [[ "$line" =~ ^#[[:space:]] || "$line" == "#" ]]; then
+    found_git_comments=1
+  fi
+  if [[ "$found_git_comments" -eq 0 ]]; then
+    user_part="${user_part}${line}"$'\n'
+  else
+    git_comments="${git_comments}${line}"$'\n'
+  fi
+done <<< "$existing"
+
+# Strip trailing newlines from user_part so we get clean spacing.
+user_part="${user_part%$'\n'}"
+
+# Compose: user area + blank line + our template + blank line + git comments.
+{
+  printf '%s\n' "$user_part"
+  printf '%s\n' "$template_block"
+  if [[ -n "$git_comments" ]]; then
+    printf '\n'
+    printf '%s' "$git_comments"
+  fi
+} > "$msg_file"
+
+exit 0

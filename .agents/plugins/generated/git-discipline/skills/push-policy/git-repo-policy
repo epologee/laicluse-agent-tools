@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# allow-comment: resolver for the coding-agent git push-policy. Prints repo facts (collaboration/visibility/default_policy/push_access) plus a derived mode + hygiene. Detection via git + gh; git config codingAgent.git.* overrides win; gh-absent falls back to the codingAgent.git.owners global. Sourced by test/push-policy/derive-mode.bats, so main is guarded. See the push-policy skill for the full model.
+set -uo pipefail
+
+derive_mode() {
+  local has_remote="$1" push_access="$2" default_policy="$3" collaboration="$4"
+  [ "$has_remote" = "no" ] && { echo "local-only"; return; }
+  [ "$push_access" != "write" ] && { echo "external"; return; }
+  [ "$default_policy" != "pushable" ] && { echo "pr-flow"; return; }
+  [ "$collaboration" = "individual" ] && { echo "solo-trunk"; return; }
+  echo "team-trunk"
+}
+
+_cfg() { git -C "$1" config --get "$2" 2>/dev/null; }
+
+_protection_meaningful() {
+  jq -r '((.required_pull_request_reviews != null) or ((.required_status_checks.contexts // []) | length > 0) or (.restrictions != null)) // false' 2>/dev/null
+}
+
+_remote_slug() {
+  local url; url=$(git -C "$1" config --get remote.origin.url 2>/dev/null)
+  [ -z "$url" ] && return 1
+  echo "$url" | sed -E 's#.*github\.com[:/]##; s#\.git$##'
+}
+
+_owner_known() {
+  local owner="$1" known
+  known=$(git config --global --get-all codingAgent.git.owners 2>/dev/null | tr '\n' ' ')
+  [[ " $known " == *" $owner "* ]]
+}
+
+_classify_collaboration() {
+  local count="$1" visibility="$2"
+  if [ "${count:-1}" -le 1 ]; then echo "individual"
+  elif [ "$visibility" = "public" ]; then echo "open"
+  else echo "closed"; fi
+}
+
+_detect_collaboration() {
+  local repo="$1" visibility="$2" authors
+  authors=$(git -C "$repo" log --format='%an' -n 200 2>/dev/null | sort -u | grep -c . )
+  _classify_collaboration "$authors" "$visibility"
+}
+
+main() {
+  local repo="${1:-$PWD}"
+  local slug owner has_remote collaboration visibility default_policy push_access confidence mode hygiene
+  local gh_json="" perm="" def="" prot=""
+
+  if [ -z "$(git -C "$repo" remote 2>/dev/null)" ]; then
+    has_remote="no"
+  else
+    has_remote="yes"
+  fi
+
+  if [ "$has_remote" = "no" ]; then
+    slug=""; owner=""
+    collaboration="$(_cfg "$repo" codingAgent.git.collaboration)"; collaboration="${collaboration:-individual}"
+    visibility="private"; default_policy="pushable"; push_access="write"; confidence="high"
+  else
+    slug="$(_remote_slug "$repo" || true)"
+    owner="${slug%%/*}"
+    gh_json="$(gh repo view "$slug" --json visibility,viewerPermission,defaultBranchRef 2>/dev/null || true)"
+    if [ -n "$gh_json" ]; then
+      confidence="high"
+      visibility="$(echo "$gh_json" | jq -r '.visibility // "" | ascii_downcase')"
+      perm="$(echo "$gh_json" | jq -r '.viewerPermission // ""')"
+      def="$(echo "$gh_json" | jq -r '.defaultBranchRef.name // ""')"
+    else
+      confidence="low"; visibility=""; perm=""; def=""
+    fi
+
+    visibility="$(_cfg "$repo" codingAgent.git.visibility || true)"; visibility="${visibility:-$(echo "$gh_json" | jq -r '.visibility // "" | ascii_downcase' 2>/dev/null)}"
+    [ -z "$visibility" ] && visibility="public"
+
+    case "$perm" in
+      ADMIN|MAINTAIN|WRITE) push_access="write" ;;
+      READ|TRIAGE)          push_access="external" ;;
+      *) if _owner_known "$owner"; then push_access="write"; else push_access="external"; fi ;;
+    esac
+    local pa_override; pa_override="$(_cfg "$repo" codingAgent.git.pushAccess || true)"
+    [ -n "$pa_override" ] && push_access="$pa_override"
+
+    default_policy="$(_cfg "$repo" codingAgent.git.defaultBranchPolicy || true)"
+    if [ -z "$default_policy" ]; then
+      if [ "$push_access" != "write" ]; then
+        default_policy="protected"
+      else
+        default_policy="pushable"
+        [ -z "$def" ] && def="$(git -C "$repo" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#origin/##')"
+        prot="$(gh api "repos/$slug/branches/$def/protection" 2>/dev/null || true)"
+        if [ -n "$prot" ] && [ "$(printf '%s' "$prot" | _protection_meaningful)" = "true" ]; then
+          default_policy="protected"
+        fi
+      fi
+    fi
+
+    collaboration="$(_cfg "$repo" codingAgent.git.collaboration || true)"
+    [ -z "$collaboration" ] && collaboration="$(_detect_collaboration "$repo" "$visibility")"
+  fi
+
+  mode="$(derive_mode "$has_remote" "$push_access" "$default_policy" "$collaboration")"
+  [ "$visibility" = "public" ] && hygiene="high" || hygiene="normal"
+
+  printf 'remote=%s\nhas_remote=%s\ncollaboration=%s\nvisibility=%s\ndefault_policy=%s\npush_access=%s\nconfidence=%s\nmode=%s\nhygiene=%s\n' \
+    "$slug" "$has_remote" "$collaboration" "$visibility" "$default_policy" "$push_access" "$confidence" "$mode" "$hygiene"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Run the git-discipline BATS test suites (validate-body + shadow-mode + block-mode +
+# migrated-hooks + install-hooks + wip-gate + template-fill + cross-layer +
+# session-toggle + repo-deny + push-policy).
+# Must be executed from the repo root (laicluse-agent-tools/).
+
+set -euo pipefail
+
+if ! command -v bats >/dev/null 2>&1; then
+  printf 'bats not found. Install bats-core first:\n'
+  printf '  brew install bats-core          # macOS via Homebrew\n'
+  printf '  apt-get install bats            # Debian/Ubuntu\n'
+  printf '  npm install -g bats             # via npm\n'
+  printf '  https://github.com/bats-core/bats-core for other options\n'
+  exit 1
+fi
+
+exec bats \
+  packages/git-discipline/test/validate-body/*.bats \
+  packages/git-discipline/test/shadow-mode/*.bats \
+  packages/git-discipline/test/block-mode/*.bats \
+  packages/git-discipline/test/migrated-hooks/*.bats \
+  packages/git-discipline/test/install-hooks/*.bats \
+  packages/git-discipline/test/wip-gate/*.bats \
+  packages/git-discipline/test/template-fill/*.bats \
+  packages/git-discipline/test/cross-layer/*.bats \
+  packages/git-discipline/test/session-toggle/*.bats \
+  packages/git-discipline/test/repo-deny/*.bats \
+  packages/git-discipline/test/push-policy/*.bats \
+  packages/git-discipline/test/cd-target/*.bats \
+  "$@"
