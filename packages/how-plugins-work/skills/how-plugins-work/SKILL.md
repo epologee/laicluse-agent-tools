@@ -169,11 +169,28 @@ ruby -ryaml -e 'YAML.safe_load(File.read(ARGV[0]).split(/^---\s*$/)[1])' SKILL.m
 
 Agent Skills are the portable layer. Keep `skills/<skill>/SKILL.md` as the shared source whenever the workflow can mean the same thing across Claude Code, Codex, and other skills-aware clients. Do not copy the skill body into an agent-specific tree just because a second client needs different installation metadata.
 
+When the workflow itself differs per agent, use paired suffixed sources instead
+of runtime branching inside one skill body:
+
+| Source file | Meaning |
+|-------------|---------|
+| `SKILL.md` | Agent-agnostic source. Use only when the same instructions are valid for every target agent. |
+| `SKILL.claude.md` | Claude-specific source. The builder materializes it as runtime `SKILL.md` for Claude. |
+| `SKILL.codex.md` | Codex-specific source. The builder materializes it as runtime `SKILL.md` for Codex. |
+
+Both Claude and Codex still require a runtime file named `SKILL.md`; the suffix
+is a source convention, not a harness feature. `build` writes the right
+`SKILL.md` target for each agent, and `check` fails when a suffixed source has
+not been materialized. If a skill has either `SKILL.claude.md` or
+`SKILL.codex.md`, it must have both. A suffixless `SKILL.md` is never a fallback
+inside an agent-specific skill; it means the skill is truly multi-agent
+compatible.
+
 Plugin and marketplace manifests are adapter layers. Claude Code and Codex both load `skills/`, but they do not use the same manifest and marketplace files:
 
 | Layer | Shared source | Claude Code adapter | Codex adapter |
 |-------|---------------|---------------------|---------------|
-| Skill body | `skills/<skill>/SKILL.md` | loaded from the plugin root | loaded from the plugin root |
+| Skill body | `skills/<skill>/SKILL.md` or suffixed source | generated/loaded as `SKILL.md` | generated/loaded as `SKILL.md` |
 | Plugin manifest | package identity and component paths | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Marketplace index | curated plugin list | `.claude-plugin/marketplace.json` | `.agents/plugins/marketplace.json` |
 | Runtime cache | none; cache is output | `~/.claude/plugins/cache/...` | `~/.codex/plugins/cache/...` |
@@ -205,6 +222,7 @@ When a shared skill has a Claude-only block and still wants to be packaged for o
 
 - A clearly labelled Claude-only section that other clients can ignore.
 - A generic instruction with runtime-specific examples underneath.
+- Paired suffixed sources (`SKILL.claude.md`, `SKILL.codex.md`) when the workflow semantics differ per agent.
 - A generated sanitized adapter view, if a client rejects the frontmatter or body syntax outright.
 
 Do not remove Claude frontmatter or hook guidance merely to satisfy another client. If another client needs stricter metadata, generate the stricter view or manifest beside the Claude source.

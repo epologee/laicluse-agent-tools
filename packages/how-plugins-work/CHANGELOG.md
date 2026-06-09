@@ -18,6 +18,15 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 The helper writes the sentinel only when stdout is non-empty, so a CHANGELOG
 without a `## [vX.Y.Z]` section stays silent on every update.
 
+## [v1.0.4]
+
+### Added
+
+- **Agent-specific skill source convention.** `SKILL.md` is now reserved for
+  truly agent-agnostic skill sources; paired `SKILL.claude.md` and
+  `SKILL.codex.md` sources are generated into runtime `SKILL.md` targets when
+  behavior needs to differ per agent.
+
 ## [v1.0.3]
 
 ### Changed

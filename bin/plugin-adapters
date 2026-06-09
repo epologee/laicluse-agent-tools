@@ -89,20 +89,88 @@ needs_sanitized_skills() {
   grep -R -E -q '^[[:space:]]*(argument[-_]hint|disable[-_]model[-_]invocation|effort|optional|scope|user[-_]invocable):' "$plugin_dir/skills" 2>/dev/null
 }
 
-copy_sanitized_skills() {
-  local plugin_dir="$1" target_dir="$2" file rel out
+has_agent_specific_skills() {
+  local plugin_dir="$1"
+  find "$plugin_dir/skills" -type f \( -name 'SKILL.claude.md' -o -name 'SKILL.codex.md' \) | grep -q .
+}
+
+skill_source_for_agent() {
+  local skill_dir="$1" agent="$2"
+  if [ -f "$skill_dir/SKILL.claude.md" ] || [ -f "$skill_dir/SKILL.codex.md" ]; then
+    [ -f "$skill_dir/SKILL.$agent.md" ] || return 1
+    printf '%s\n' "$skill_dir/SKILL.$agent.md"
+  elif [ -f "$skill_dir/SKILL.md" ]; then
+    printf '%s\n' "$skill_dir/SKILL.md"
+  else
+    return 1
+  fi
+}
+
+validate_skill_sources() {
+  local plugin="$1" plugin_dir="$2" skill_dir skill
+  for skill_dir in "$plugin_dir"/skills/*; do
+    [ -d "$skill_dir" ] || continue
+    skill="$(basename "$skill_dir")"
+    if [ -f "$skill_dir/SKILL.claude.md" ] || [ -f "$skill_dir/SKILL.codex.md" ]; then
+      [ -f "$skill_dir/SKILL.claude.md" ] ||
+        die "plugin $plugin skill $skill has SKILL.codex.md but no SKILL.claude.md"
+      [ -f "$skill_dir/SKILL.codex.md" ] ||
+        die "plugin $plugin skill $skill has SKILL.claude.md but no SKILL.codex.md"
+    else
+      [ -f "$skill_dir/SKILL.md" ] ||
+        die "plugin $plugin skill $skill has no source (SKILL.md or both SKILL.claude.md and SKILL.codex.md)"
+    fi
+  done
+}
+
+copy_skill_file() {
+  local src="$1" out="$2" sanitize="$3"
+  mkdir -p "$(dirname "$out")"
+  if [ "$sanitize" -eq 1 ]; then
+    awk 'tolower($0) !~ /^[[:space:]]*(argument[-_]hint|disable[-_]model[-_]invocation|effort|optional|scope|user[-_]invocable):/' "$src" > "$out"
+  else
+    cp "$src" "$out"
+  fi
+}
+
+copy_claude_skill_targets() {
+  local repo="$1" out_root="$2" plugin_dir="$3" skill_dir rel src out
+  for skill_dir in "$plugin_dir"/skills/*; do
+    [ -d "$skill_dir" ] || continue
+    [ -f "$skill_dir/SKILL.claude.md" ] || continue
+    src="$skill_dir/SKILL.claude.md"
+    rel="${skill_dir#$repo/}/SKILL.md"
+    out="$out_root/$rel"
+    copy_skill_file "$src" "$out" 0
+  done
+}
+
+copy_codex_skills() {
+  local plugin_dir="$1" target_dir="$2" file rel out skill_dir src
   rm -rf "$target_dir/skills"
   mkdir -p "$target_dir/skills"
   while IFS= read -r file; do
+    case "$(basename "$file")" in
+      SKILL.md|SKILL.claude.md|SKILL.codex.md) continue ;;
+    esac
     rel="${file#$plugin_dir/}"
     out="$target_dir/$rel"
     mkdir -p "$(dirname "$out")"
-    if [ "$(basename "$file")" = "SKILL.md" ]; then
-      awk 'tolower($0) !~ /^[[:space:]]*(argument[-_]hint|disable[-_]model[-_]invocation|effort|optional|scope|user[-_]invocable):/' "$file" > "$out"
-    else
-      cp "$file" "$out"
-    fi
+    cp "$file" "$out"
   done < <(find "$plugin_dir/skills" -type f | sort)
+  for skill_dir in "$plugin_dir"/skills/*; do
+    [ -d "$skill_dir" ] || continue
+    src="$(skill_source_for_agent "$skill_dir" codex)"
+    rel="${skill_dir#$plugin_dir/}/SKILL.md"
+    copy_skill_file "$src" "$target_dir/$rel" 1
+  done
+}
+
+generated_claude_skill_targets() {
+  local root="$1" file
+  while IFS= read -r file; do
+    printf '%s/SKILL.md\n' "$(dirname "$file")"
+  done < <(find "$root" -path "*/skills/*/SKILL.claude.md" -type f 2>/dev/null | sort)
 }
 
 generate_into() {
@@ -121,14 +189,16 @@ generate_into() {
     manifest="$plugin_dir/.claude-plugin/plugin.json"
     [ -f "$manifest" ] || die "plugin $name is missing .claude-plugin/plugin.json"
     [ -d "$plugin_dir/skills" ] || die "plugin $name is missing skills/"
+    validate_skill_sources "$name" "$plugin_dir"
+    copy_claude_skill_targets "$repo" "$out_root" "$plugin_dir"
 
-    if needs_sanitized_skills "$plugin_dir"; then
+    if has_agent_specific_skills "$plugin_dir" || needs_sanitized_skills "$plugin_dir"; then
       codex_source="./.agents/plugins/generated/$name"
       target_dir="$out_root/.agents/plugins/generated/$name"
       rm -rf "$target_dir"
       rm -rf "$out_root/${source#./}/.codex-plugin"
       mkdir -p "$target_dir/.codex-plugin"
-      copy_sanitized_skills "$plugin_dir" "$target_dir"
+      copy_codex_skills "$plugin_dir" "$target_dir"
       codex_plugin_payload "$manifest" "$name" > "$target_dir/.codex-plugin/plugin.json"
     else
       codex_source="$source"
@@ -162,6 +232,7 @@ expected_files() {
   {
     find "$out_root/.agents" -type f 2>/dev/null
     find "$out_root" -path "*/.codex-plugin/plugin.json" -type f 2>/dev/null
+    find "$out_root" -path "*/skills/*/SKILL.md" -type f 2>/dev/null
   } | sort -u
 }
 
@@ -170,6 +241,7 @@ actual_files() {
   {
     find "$repo/.agents" -type f 2>/dev/null
     find "$repo" -path "*/.codex-plugin/plugin.json" -type f 2>/dev/null
+    generated_claude_skill_targets "$repo"
   } | sort -u
 }
 
