@@ -16,13 +16,14 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 The helper writes the sentinel only when stdout is non-empty, so a CHANGELOG
 without a `## [vX.Y.Z]` section stays silent on every update.
 
-## [v1.0.1]
+## [v2.0.1]
 
 ### Changed
 
-- **Private multi-agent baseline.** `second-opinion` now has agent-specific
-  sources: Claude asks Codex via `codex exec`, while Codex asks Claude via
-  `claude -p`. Runtime state moved under
+- **intervision now ships from the public laicluse-agent-tools marketplace.**
+  It replaces `intervision@leclause`; uninstall that copy if you still have it.
+- **`second-opinion` is multi-agent.** Claude asks Codex via `codex exec`,
+  while Codex asks Claude via `claude -p`. Runtime state lives under
   `${LAICLUSE_AGENT_HOME:-~/.laicluse-agent}/intervision`.
 
 ## [v1.0.7]

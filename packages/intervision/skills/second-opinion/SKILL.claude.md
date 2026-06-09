@@ -6,7 +6,6 @@ description: >-
   from another vendor's coding agent. Claude-side variant: hands the diff or
   design to Codex via `codex exec`, surfaces its independent read, and goes
   back and forth.
-effort: medium
 ---
 
 <post-update-broadcast>
