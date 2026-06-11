@@ -207,3 +207,21 @@ Verified: operator-confirmed')")
   first_occurrence=$(printf '%s' "$output" | grep -n 'missing-tests' | head -1 | cut -d: -f1)
   [[ "$first_occurrence" -le 3 ]]
 }
+
+# ---------------------------------------------------------------------------
+# The deny text matches actual gate behaviour: --no-verify is not an escape
+# at the PreToolUse layer, so a --no-verify commit is still denied and the
+# message must not advertise that flag as the way out.
+# ---------------------------------------------------------------------------
+
+@test "no-verify commit is still denied and the deny names the sentinel route" {
+  export GIT_SHIM_SHORTSTAT=" 2 files changed, 30 insertions(+)"
+  export GIT_SHIM_DIFF_NAMES="$(printf 'app/models/session.rb\nspec/models/session_spec.rb')"
+  export GIT_SHIM_INTERPRET_TRAILERS_OUTPUT=""
+
+  run_dispatch 'git commit --no-verify -m "Session boundary model for transaction events" # ack-rule4:essentie'
+
+  [ "$status" -eq 2 ]
+  [[ "$output" != *"Escape: git commit --no-verify"* ]]
+  [[ "$output" == *"disable-discipline"* ]]
+}
