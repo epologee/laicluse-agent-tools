@@ -19,7 +19,7 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 Version numbers may therefore be non-contiguous (an internal refactor bumps
 the version without producing an entry here).
 
-## [v2.0.13]
+## [v2.0.15]
 
 ### Breaking
 
@@ -33,8 +33,6 @@ the version without producing an entry here).
   `enable-git`) now hand you a ready-to-paste `! `-prefixed command instead of
   running it; your keystroke is the switch. Read-only inspection
   (`discipline-status`) is unaffected.
-
-## [v2.0.7]
 
 ### Fixed
 
