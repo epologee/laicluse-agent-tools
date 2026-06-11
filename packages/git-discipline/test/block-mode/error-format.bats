@@ -223,5 +223,6 @@ Verified: operator-confirmed')")
 
   [ "$status" -eq 2 ]
   [[ "$output" != *"Escape: git commit --no-verify"* ]]
+  [[ "$output" == *"only the operator (not the agent)"* ]]
   [[ "$output" == *"disable-discipline"* ]]
 }

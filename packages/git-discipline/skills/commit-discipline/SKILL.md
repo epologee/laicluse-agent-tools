@@ -693,7 +693,8 @@ PreToolUse:Bash layer. The git-native commit-msg hook re-derives the
 trivial flag from the staged diff on every run; an externally exported
 value does not bypass that hook. For trivial-but-larger commits at the
 git-native layer there is no shortcut: write the schema body or use
-`git commit --no-verify` (logged as an emergency bypass).
+`git commit --no-verify` (logged as an emergency bypass; it only skips
+that layer, inside a Claude session the PreToolUse guards still apply).
 
 ## Troubleshooting
 

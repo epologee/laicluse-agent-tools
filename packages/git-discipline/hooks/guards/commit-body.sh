@@ -101,7 +101,7 @@ guard_commit_body() {
   fi
 
   local deny_msg
-  deny_msg=$(printf '%s%s\n\nRewrite the commit message and rerun the same git commit call; the commit object has not been created yet. Expected body format:\n\n%s\n\nOpt-out tokens for Slice: %s\n\nNo bypass flag exists at this layer; --no-verify only skips git-native hooks and this gate still applies. If the discipline itself is the problem, the operator can lift it via /git-discipline:disable-discipline.' \
+  deny_msg=$(printf '%s%s\n\nRewrite the commit message and rerun the same git commit call; the commit object has not been created yet. Expected body format:\n\n%s\n\nOpt-out tokens for Slice: %s\n\nNo bypass flag exists at this layer; --no-verify only skips git-native hooks and this gate still applies. If the discipline itself is the problem, only the operator (not the agent) can lift it via /git-discipline:disable-discipline.' \
     "$stage_hint" \
     "$violation_output" \
     "$example" \
