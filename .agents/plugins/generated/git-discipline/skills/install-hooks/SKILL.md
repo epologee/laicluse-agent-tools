@@ -82,8 +82,11 @@ needs no further arguments.
   git-native hooks this skill installs; the installed `post-commit` logs that
   usage to
   `${LAICLUSE_HOME:-~/.laicluse}/git-discipline/git-discipline-no-verify.log` so it is reviewable after the fact.
-  It does not bypass the PreToolUse guards inside a Claude session; there the
-  only off-switch is the operator-only `/git-discipline:disable-discipline`.
+
+**Note:** inside a Claude session `--no-verify` does not bypass the
+PreToolUse guards; see the `--no-verify` section of
+`/git-discipline:commit-discipline` for the layer split and the
+operator-only off-switch.
 
 ## Example output
 

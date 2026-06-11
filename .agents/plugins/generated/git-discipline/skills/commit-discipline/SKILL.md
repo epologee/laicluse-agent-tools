@@ -631,12 +631,16 @@ carried along (see below).
 does NOT bypass the PreToolUse:Bash guards: those validate every git commit
 command, flags included, so inside a Claude session a `--no-verify` commit
 with a schema violation is still denied. The only PreToolUse off-switch is
-the operator-only `/git-discipline:disable-discipline` sentinel. For commits
-outside Claude (CLI, IDE), the installed post-commit hook logs `--no-verify`
-usage to
+the operator-only `/git-discipline:disable-discipline` sentinel: it writes a
+session-scoped sentinel file that tells the dispatcher to skip all guards,
+and `/git-discipline:enable-discipline` removes it. This section is the
+canonical statement of the layer split; the README and install-hooks notes
+point here. For commits outside Claude (CLI, IDE), the installed post-commit
+hook logs `--no-verify` usage to
 `${LAICLUSE_HOME:-~/.laicluse}/git-discipline/git-discipline-no-verify.log` for after-the-fact auditing.
 
-**Race window limitation:** the detector uses a trace window of 30
+**Audit-log race window (outside Claude, detection only, not
+enforcement):** the detector uses a trace window of 30
 seconds. Concurrent commits in another shell can refresh the trace
 and mask a bypass in this shell. Long test runs (>30s between starting
 commit-msg and post-commit firing) can produce false positives.
@@ -683,16 +687,16 @@ read the command string.
 
 Set automatically by the PreToolUse:Bash guard when the staged diff has
 at most 1 file and at most 5 insertions. Can also be exported manually
-to skip body validation for a specific trivial commit.
-Not persistent; applies only to the next commit.
+inside a Claude session to skip body validation for a specific trivial
+commit. Not persistent; applies only to the next commit.
 
 **Limitation:** manual export of `GIT_DISCIPLINE_TRIVIAL_OK=1` only applies to the
 PreToolUse:Bash layer. The git-native commit-msg hook re-derives the
 trivial flag from the staged diff on every run; an externally exported
 value does not bypass that hook. For trivial-but-larger commits at the
 git-native layer there is no shortcut: write the schema body or use
-`git commit --no-verify` (logged as an emergency bypass; it only skips
-that layer, inside a Claude session the PreToolUse guards still apply).
+`git commit --no-verify` (audit-logged; see the `--no-verify` section
+above for layer scope).
 
 ## Troubleshooting
 
@@ -767,11 +771,19 @@ for the push and report the edge case.
 ## Session-level kill-switch
 
 When you want to temporarily turn off the git-discipline guards without disabling
-the plugin globally, use `/git-discipline:disable-discipline`. That writes a sentinel file in
+the plugin globally, use `/git-discipline:disable-discipline`. That uses a sentinel file in
 `${LAICLUSE_HOME:-~/.laicluse}/git-discipline/` with your session id; the dispatcher exits early on every
 `git commit` or `git push`. Re-enable with `/git-discipline:enable-discipline`. Status check with
-`/git-discipline:discipline-status`. The skills are user-invocable; Claude does not
-invoke them itself to bypass the discipline.
+`/git-discipline:discipline-status`.
+
+The flip itself is operator-actuated. The `sentinel-protect` guard runs with
+the safety locks, before the disabled-sentinel early exit (so it also fires
+while discipline is off), and denies any agent-driven Bash call that creates
+or removes a `git-discipline-disabled-*` or `.git/git-discipline-deny`
+sentinel, in both directions and with no magic-comment or env-var escape.
+The toggle skills therefore hand the operator a ready-to-paste `! `-prefixed
+command instead of running it themselves; the operator's keystroke is the
+switch. Read-only inspection of the sentinel paths stays open.
 
 ## Architecture
 
