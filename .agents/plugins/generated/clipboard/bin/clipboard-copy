@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-const { spawnSync } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { spawnSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 if (process.platform !== 'darwin') {
   process.stderr.write('clipboard-copy: macOS only (depends on pbcopy / pbcopy-html.swift).\n');
@@ -17,16 +18,16 @@ if (unknown.length > 0) {
   process.exit(2);
 }
 
-const stdin = fs.readFileSync(0);
+const stdin = readFileSync(0);
 if (stdin.length === 0) {
   process.stderr.write('clipboard-copy: empty stdin.\n');
   process.exit(3);
 }
 
-const binDir = path.dirname(fs.realpathSync(__filename));
-const swiftScript = path.join(binDir, '..', 'skills', 'clipboard', 'pbcopy-html.swift');
+const binDir = dirname(realpathSync(fileURLToPath(import.meta.url)));
+const swiftScript = join(binDir, '..', 'skills', 'clipboard', 'pbcopy-html.swift');
 
-if (html && !fs.existsSync(swiftScript)) {
+if (html && !existsSync(swiftScript)) {
   process.stderr.write(`clipboard-copy: pbcopy-html.swift not found at ${swiftScript}. The helper expects it in skills/clipboard/ of the same plugin install.\n`);
   process.exit(6);
 }
