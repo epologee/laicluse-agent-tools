@@ -19,6 +19,21 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 Version numbers may therefore be non-contiguous (an internal refactor bumps
 the version without producing an entry here).
 
+## [v2.0.13]
+
+### Breaking
+
+- **Flipping the discipline or the per-repo git lock is now operator-actuated.**
+  A new `sentinel-protect` guard denies any agent-driven Bash call that
+  creates or removes a `git-discipline-disabled-*` or `.git/git-discipline-deny`
+  sentinel, in both directions (off AND back on) and with no magic-comment or
+  env-var escape. The guard runs before the disabled-sentinel early exit, so a
+  session whose discipline is off cannot quietly re-enable it either. The
+  toggle skills (`disable-discipline`, `enable-discipline`, `disable-git`,
+  `enable-git`) now hand you a ready-to-paste `! `-prefixed command instead of
+  running it; your keystroke is the switch. Read-only inspection
+  (`discipline-status`) is unaffected.
+
 ## [v2.0.7]
 
 ### Fixed
