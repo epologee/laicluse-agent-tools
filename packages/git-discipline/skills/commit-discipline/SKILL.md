@@ -773,11 +773,19 @@ for the push and report the edge case.
 ## Session-level kill-switch
 
 When you want to temporarily turn off the git-discipline guards without disabling
-the plugin globally, use `/git-discipline:disable-discipline`. That writes a sentinel file in
+the plugin globally, use `/git-discipline:disable-discipline`. That uses a sentinel file in
 `${LAICLUSE_HOME:-~/.laicluse}/git-discipline/` with your session id; the dispatcher exits early on every
 `git commit` or `git push`. Re-enable with `/git-discipline:enable-discipline`. Status check with
-`/git-discipline:discipline-status`. The skills are user-invocable; Claude does not
-invoke them itself to bypass the discipline.
+`/git-discipline:discipline-status`.
+
+The flip itself is operator-actuated. The `sentinel-protect` guard runs with
+the safety locks, before the disabled-sentinel early exit (so it also fires
+while discipline is off), and denies any agent-driven Bash call that creates
+or removes a `git-discipline-disabled-*` or `.git/git-discipline-deny`
+sentinel, in both directions and with no magic-comment or env-var escape.
+The toggle skills therefore hand the operator a ready-to-paste `! `-prefixed
+command instead of running it themselves; the operator's keystroke is the
+switch. Read-only inspection of the sentinel paths stays open.
 
 ## Architecture
 
