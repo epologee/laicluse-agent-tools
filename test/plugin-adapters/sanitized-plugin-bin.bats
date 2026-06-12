@@ -3,17 +3,19 @@
 #
 # A plugin whose skills need sanitization installs for Codex from the
 # generated dir under .agents/plugins/generated/<name>/. Skills that invoke
-# helpers from the plugin's bin/ ("resolve the plugin root from where this
-# skill file was loaded") then need bin/ to exist in that generated dir,
-# otherwise the Codex install ships prompts that point at missing binaries
-# (observed with clipboard-copy and anger-log).
+# helpers from the plugin root ("resolve the plugin root from where this
+# skill file was loaded") then need support files to exist in that generated
+# dir, otherwise the Codex install ships prompts that point at missing files
+# (observed with clipboard-copy, anger-log, and git-discipline's git-native
+# hook libraries).
 
 SCRIPT="$BATS_TEST_DIRNAME/../../bin/plugin-adapters"
 
 setup() {
   export REPO="$BATS_TEST_TMPDIR/repo"
   mkdir -p "$REPO/.claude-plugin" "$REPO/packages/demo/.claude-plugin" \
-           "$REPO/packages/demo/skills/demo" "$REPO/packages/demo/bin"
+           "$REPO/packages/demo/skills/demo" "$REPO/packages/demo/bin" \
+           "$REPO/packages/demo/hooks/lib"
   cat > "$REPO/.claude-plugin/marketplace.json" <<'JSON'
 {
   "name": "demo-marketplace",
@@ -35,6 +37,8 @@ description: demo skill
 MD
   printf '#!/bin/sh\necho helper\n' > "$REPO/packages/demo/bin/demo-helper"
   chmod +x "$REPO/packages/demo/bin/demo-helper"
+  printf 'demo hook lib\n' > "$REPO/packages/demo/hooks/lib/demo-lib.sh"
+  printf '{"hooks":{"PreToolUse":[]}}\n' > "$REPO/packages/demo/hooks/hooks.json"
 }
 
 @test "build copies bin/ into the generated codex dir for sanitized plugins" {
@@ -44,11 +48,27 @@ MD
   [ -x "$REPO/.agents/plugins/generated/demo/bin/demo-helper" ]
 }
 
+@test "build copies hooks/lib into the generated codex dir for sanitized plugins" {
+  bash "$SCRIPT" build "$REPO" > /dev/null
+
+  [ -f "$REPO/.agents/plugins/generated/demo/hooks/lib/demo-lib.sh" ]
+  [ ! -f "$REPO/.agents/plugins/generated/demo/hooks/hooks.json" ]
+}
+
 @test "check passes after build with a bin directory present" {
   bash "$SCRIPT" build "$REPO" > /dev/null
 
   run bash "$SCRIPT" check "$REPO"
   [ "$status" -eq 0 ]
+}
+
+@test "a stale generated hook library that no longer exists in the source is drift" {
+  bash "$SCRIPT" build "$REPO" > /dev/null
+  printf 'stale\n' > "$REPO/.agents/plugins/generated/demo/hooks/lib/stale-lib.sh"
+
+  run bash "$SCRIPT" check "$REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"stale-lib.sh"* ]]
 }
 
 @test "a stale generated bin file that no longer exists in the source is drift" {

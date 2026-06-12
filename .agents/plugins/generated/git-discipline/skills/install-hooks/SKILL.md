@@ -3,7 +3,7 @@ name: install-hooks
 description: >
   Install git-discipline's four git-native hooks (commit-msg, prepare-commit-msg,
   post-commit, pre-push) into the current repo so commits and pushes done
-  outside Claude Code (CLI, IDE, another tool) still get the body-schema
+  outside Claude Code's PreToolUse layer (CLI, IDE, Codex, another tool) still get the body-schema
   validation and wip-gate enforcement. Run once per clone. Use --force to
   overwrite existing hooks.
 ---
@@ -11,7 +11,8 @@ description: >
 # Install Hooks
 
 Place git-discipline's four git-native hooks into the current repo, so commits
-and pushes made outside of Claude Code are also guarded.
+and pushes made outside Claude Code's PreToolUse layer are also guarded. In
+Codex, these git-native hooks are the enforcement layer.
 
 The four hooks:
 
@@ -40,10 +41,10 @@ behavior never diverges.
 1. Verifies that we are inside a git repo (`git rev-parse --git-dir`).
 2. Detects whether `core.hooksPath` is set, and picks the correct target
    directory (`.git/hooks/` or the value of `core.hooksPath`).
-3. Finds the plugin install path via `~/.claude/plugins/installed_plugins.json`
-   and bakes that absolute path into each hook (placeholder
-   `__PLUGIN_INSTALL_PATH__` is replaced). Re-running after a plugin update
-   refreshes the path.
+3. Finds the plugin root from the `lib/install.sh` script's own location and
+   bakes that absolute path into each hook (placeholder
+   `__PLUGIN_INSTALL_PATH__` is replaced). Re-running after a plugin update or
+   reinstall refreshes the path.
 4. Per hook (`commit-msg`, `prepare-commit-msg`, `post-commit`,
    `pre-push`), copies the source from the plugin to the target dir, sets
    the executable bit, and logs the result.
@@ -60,18 +61,13 @@ behavior never diverges.
 ## How to use
 
 ```bash
-# Standard install in the current repo:
-bash "$(jq -r '.plugins["git-discipline@laicluse-agent-tools"][0].installPath' ~/.claude/plugins/installed_plugins.json)/skills/install-hooks/lib/install.sh"
-
-# Or via the skill invocation:
 /git-discipline:install-hooks
 /git-discipline:install-hooks --dry-run
 /git-discipline:install-hooks --force
 ```
 
-The skill runs `lib/install.sh` from this skill directory. The script
-detects the plugin install path itself via `installed_plugins.json` and
-needs no further arguments.
+The skill runs `lib/install.sh` from this skill directory. The script detects
+the plugin root from its own path and needs no further arguments.
 
 ## Conflict detection and escape hatches
 
@@ -93,7 +89,7 @@ operator-only off-switch.
 ```
 git-discipline:install-hooks
   hooks dir   : .git/hooks (default)
-  plugin path : ~/.claude/plugins/cache/epologee/git-discipline/1.0.30
+  plugin path : /path/to/git-discipline
   installed   : commit-msg
   installed   : prepare-commit-msg
   installed   : post-commit
@@ -119,8 +115,8 @@ exit 1
 
 ## Post-update procedure
 
-After every `claude plugins update git-discipline@laicluse-agent-tools`, the baked plugin path in
-the installed hooks is stale. Run in every repo where the hooks are active:
+After every plugin update or reinstall, the baked plugin path in the installed
+hooks may be stale. Run in every repo where the hooks are active:
 
 ```bash
 /git-discipline:install-hooks --force

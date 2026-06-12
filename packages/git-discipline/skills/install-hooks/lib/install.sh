@@ -9,9 +9,7 @@
 #   packages/git-discipline/skills/commit-discipline/git-hooks/
 # Each source hook references "__PLUGIN_INSTALL_PATH__/hooks/lib/validate-body.sh".
 # At install time the placeholder is substituted with the absolute plugin
-# install path resolved from ~/.claude/plugins/installed_plugins.json (or, when
-# running directly from a development checkout, the repo path that contains
-# this script).
+# install path resolved from the plugin root that contains this script.
 #
 # Slice 6 ships commit-msg + post-commit. The script also installs
 # prepare-commit-msg and pre-push when they exist so slices 7 and 8 do not
@@ -84,32 +82,31 @@ fi
 # Resolve plugin install path
 # ---------------------------------------------------------------------------
 # Strategy:
-# 1. If we are running from inside a Claude Code plugin install cache
-#    (installed_plugins.json points here), use that absolute path.
-# 2. Otherwise (development checkout: laicluse-agent-tools/packages/git-discipline/...),
-#    use $PLUGIN_ROOT directly.
+# 1. Prefer the plugin root that contains this script. This works for Claude
+#    cache installs, Codex generated installs, and development checkouts.
+# 2. Fall back to Claude's installed_plugins.json only for legacy layouts where
+#    the script-local root does not contain the shared hook libraries.
 
 plugin_install_path=""
-plugins_json="$HOME/.claude/plugins/installed_plugins.json"
 
-if [[ -f "$plugins_json" ]] && command -v jq >/dev/null 2>&1; then
-  plugin_install_path=$(jq -r \
-    '.plugins["git-discipline@laicluse-agent-tools"][0].installPath // empty' \
-    "$plugins_json" 2>/dev/null || true)
+if [[ -f "$PLUGIN_ROOT/hooks/lib/validate-body.sh" ]]; then
+  plugin_install_path="$PLUGIN_ROOT"
+else
+  plugins_json="$HOME/.claude/plugins/installed_plugins.json"
+  if [[ -f "$plugins_json" ]] && command -v jq >/dev/null 2>&1; then
+    plugin_install_path=$(jq -r \
+      '.plugins["git-discipline@laicluse-agent-tools"][0].installPath // empty' \
+      "$plugins_json" 2>/dev/null || true)
+  fi
 fi
 
 # Validate: the resolved path must contain hooks/lib/validate-body.sh.
 if [[ -z "$plugin_install_path" ]] \
    || [[ ! -f "$plugin_install_path/hooks/lib/validate-body.sh" ]]; then
-  # Fall back to development checkout path.
-  if [[ -f "$PLUGIN_ROOT/hooks/lib/validate-body.sh" ]]; then
-    plugin_install_path="$PLUGIN_ROOT"
-  else
-    printf 'git-discipline:install-hooks ERROR: cannot resolve plugin install path.\n' >&2
-    printf '  Tried installed_plugins.json: %s\n' "${plugin_install_path:-<empty>}" >&2
-    printf '  Tried development checkout : %s\n' "$PLUGIN_ROOT" >&2
-    exit 1
-  fi
+  printf 'git-discipline:install-hooks ERROR: cannot resolve plugin install path.\n' >&2
+  printf '  Tried script-local root : %s\n' "$PLUGIN_ROOT" >&2
+  printf '  Tried Claude fallback   : %s\n' "${plugin_install_path:-<empty>}" >&2
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------

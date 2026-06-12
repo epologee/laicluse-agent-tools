@@ -31,6 +31,27 @@ load helpers
   grep -q '/hooks/lib/validate-body.sh' "$(hook_target_path commit-msg)"
 }
 
+@test "installer prefers the script-local plugin root over a stale Claude install" {
+  stale="$BATS_TEST_TMPDIR/stale-claude-install"
+  mkdir -p "$stale/hooks/lib" "$HOME/.claude/plugins"
+  printf 'stale validator\n' > "$stale/hooks/lib/validate-body.sh"
+  cat > "$HOME/.claude/plugins/installed_plugins.json" <<JSON
+{
+  "plugins": {
+    "git-discipline@laicluse-agent-tools": [
+      { "installPath": "$stale" }
+    ]
+  }
+}
+JSON
+
+  run_install "$TEST_REPO"
+
+  [ "$status" -eq 0 ]
+  grep -q "PLUGIN_PATH=\"$REPO_ROOT/packages/git-discipline\"" "$(hook_target_path commit-msg)"
+  ! grep -q "$stale" "$(hook_target_path commit-msg)"
+}
+
 @test "post-commit does not need the placeholder substitution but installs cleanly" {
   run_install "$TEST_REPO"
 

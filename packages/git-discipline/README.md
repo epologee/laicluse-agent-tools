@@ -142,8 +142,8 @@ into each repo:
 ```
 
 Use `--dry-run` to preview, `--force` to overwrite existing hooks. Re-run
-after each `claude plugins update git-discipline@laicluse-agent-tools` so the installed hooks
-point at the current plugin version.
+after each plugin update or Codex reinstall so the installed hooks point at
+the current plugin version.
 
 ## Example commit message
 
