@@ -27,7 +27,7 @@ the rest of this skill.
 If the command produces no output, say nothing about updates and proceed.
 
 The helper writes the sentinel only when stdout was non-empty, so a silent
-run does not mark the version as seen. `/laicluse:whats-new gurus`
+run does not mark the version as seen. `/whats-new gurus`
 re-shows the section on demand without touching the sentinel.
 </post-update-broadcast>
 

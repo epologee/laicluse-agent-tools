@@ -33,9 +33,9 @@
       "source": "./packages/anger-management"
     },
     {
-      "name": "laicluse",
-      "description": "Marketplace-wide utilities for the laicluse-agent-tools marketplace. Currently ships /laicluse:whats-new, a one-stop reader for the post-update CHANGELOG section of any installed laicluse-agent-tools plugin.",
-      "source": "./packages/laicluse"
+      "name": "laicluse-agent-tools",
+      "description": "Marketplace-wide utilities for the laicluse-agent-tools marketplace. Currently ships /whats-new (namespaced as /laicluse-agent-tools:whats-new when needed), a one-stop reader for the post-update CHANGELOG section of any installed plugin.",
+      "source": "./packages/laicluse-agent-tools"
     },
     {
       "name": "autonomous",

@@ -16,10 +16,10 @@ if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
 fi
 ```
 
-If the command produces output, the laicluse plugin was updated since
+If the command produces output, the laicluse-agent-tools plugin was updated since
 the last time you saw the broadcast on this machine. Show the output
 verbatim in a markdown block, prefixed with one short sentence
-("laicluse was updated; here is what changed."). Then continue with
+("laicluse-agent-tools was updated; here is what changed."). Then continue with
 the rest of this skill.
 
 If the command produces no output, say nothing about updates and proceed.
@@ -30,10 +30,14 @@ run does not mark the version as seen. In agents that do not set
 guard's purpose, not an oversight.
 </post-update-broadcast>
 
-# /laicluse:whats-new
+# /whats-new
 
 Show the CHANGELOG section of an installed laicluse-agent-tools plugin
 without touching the post-update broadcast sentinel.
+
+The normal user-facing command is `/whats-new`. The fully namespaced fallback
+is `/laicluse-agent-tools:whats-new` if another installed plugin ever makes the
+bare form ambiguous.
 
 ## What to do
 
@@ -66,17 +70,17 @@ marketplace CHANGELOG, then a one-line index of the plugins that
 ship their own per-plugin CHANGELOG so the operator can drill in.
 
 ```bash
-LAICLUSE=$(jq -r '.plugins["laicluse@laicluse-agent-tools"][0].installPath // empty' \
+TOOLS=$(jq -r '.plugins["laicluse-agent-tools@laicluse-agent-tools"][0].installPath // empty' \
   ~/.claude/plugins/installed_plugins.json)
-if [ -z "$LAICLUSE" ] || [ ! -f "$LAICLUSE/MARKETPLACE-CHANGELOG.md" ]; then
-  echo "laicluse@laicluse-agent-tools is not installed or missing MARKETPLACE-CHANGELOG.md."
+if [ -z "$TOOLS" ] || [ ! -f "$TOOLS/MARKETPLACE-CHANGELOG.md" ]; then
+  echo "laicluse-agent-tools@laicluse-agent-tools is not installed or missing MARKETPLACE-CHANGELOG.md."
   exit 0
 fi
 
 awk '
   /^## \[/ { count++; if (count == 2) exit }
   count == 1 { print }
-' "$LAICLUSE/MARKETPLACE-CHANGELOG.md"
+' "$TOOLS/MARKETPLACE-CHANGELOG.md"
 
 echo
 echo "---"
@@ -91,7 +95,7 @@ jq -r '.plugins | to_entries[] | select(.key | endswith("@laicluse-agent-tools")
   fi
 done
 echo
-echo "Pass a plugin name to drill in: /laicluse:whats-new <plugin>"
+echo "Pass a plugin name to drill in: /whats-new <plugin>"
 ```
 
 Place the awk output verbatim in a markdown block. Then the index

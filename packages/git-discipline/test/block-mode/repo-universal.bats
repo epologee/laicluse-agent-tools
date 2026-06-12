@@ -24,7 +24,7 @@ load helpers
   export GIT_SHIM_DIFF_NAMES="$(printf 'a.rb\nb.rb\nc.rb')"
   export GIT_SHIM_INTERPRET_TRAILERS_OUTPUT=""
 
-  run_dispatch 'git commit -m "Extend laicluse plugin" # ack-rule4:essentie'
+  run_dispatch 'git commit -m "Extend laicluse-agent-tools plugin" # ack-rule4:essentie'
 
   [ "$status" -eq 2 ]
 }

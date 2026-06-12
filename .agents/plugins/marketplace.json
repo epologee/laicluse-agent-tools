@@ -65,10 +65,10 @@
       "category": "Productivity"
     },
     {
-      "name": "laicluse",
+      "name": "laicluse-agent-tools",
       "source": {
         "source": "local",
-        "path": "./.agents/plugins/generated/laicluse"
+        "path": "./.agents/plugins/generated/laicluse-agent-tools"
       },
       "policy": {
         "installation": "AVAILABLE",

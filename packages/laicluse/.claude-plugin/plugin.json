@@ -1,5 +1,0 @@
-{
-  "name": "laicluse",
-  "description": "Marketplace-wide utilities for the laicluse-agent-tools marketplace. Currently ships /laicluse:whats-new, a one-stop reader for the post-update CHANGELOG section of any installed laicluse-agent-tools plugin.",
-  "version": "2.0.1"
-}

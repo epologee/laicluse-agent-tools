@@ -2,7 +2,8 @@
 
 Marketplace-wide news. Per-plugin changes go in
 `packages/<plugin>/CHANGELOG.md` and surface via
-`/laicluse:whats-new <plugin>`. This file covers the ecosystem:
+`/whats-new <plugin>` (or `/laicluse-agent-tools:whats-new <plugin>` when a
+namespaced form is needed). This file covers the ecosystem:
 new plugins joining, plugins leaving, marketplace-level
 conventions, shared infrastructure, and breaking changes that
 span multiple plugins.
@@ -15,5 +16,5 @@ The public l'Aicluse Agent Tools marketplace now ships:
 old `autonomous`), and `clipboard`. Each replaced plugin left a tombstone
 in `leclause-skills` whose SessionStart notice carries the migration
 commands. Existing `.autonomous/` loop files stay compatible with the new
-rover. The `laicluse` meta plugin (this one) carries `/laicluse:whats-new`
+rover. The `laicluse-agent-tools` utility plugin (this one) carries `/whats-new`
 for re-reading any plugin's latest CHANGELOG section on demand.
