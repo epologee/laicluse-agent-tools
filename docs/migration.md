@@ -31,6 +31,9 @@ During the transition:
 - The new canonical plugin name for clipboard is
   `clipboard@laicluse-agent-tools`. It replaces `clipboard@leclause`; the
   commands (`/clipboard`, `/clipboard slack`) are unchanged.
+- The new canonical plugin name for gurus is `gurus@laicluse-agent-tools`. It
+  replaces `gurus@leclause` and removes `rover`'s dependency on the legacy
+  marketplace.
 - Migration status belongs here and in package-specific changelogs or stubs,
   not in `how-plugins-work`. That skill documents plugin mechanics only:
   naming, aliases, cache behavior, and adapter sync.

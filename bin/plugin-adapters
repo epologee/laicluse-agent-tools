@@ -178,6 +178,18 @@ copy_codex_bin() {
   done < <(find "$plugin_dir/bin" -type f | sort)
 }
 
+copy_codex_agents() {
+  local plugin_dir="$1" target_dir="$2" file rel out
+  rm -rf "$target_dir/agents"
+  [ -d "$plugin_dir/agents" ] || return 0
+  while IFS= read -r file; do
+    rel="${file#$plugin_dir/}"
+    out="$target_dir/$rel"
+    mkdir -p "$(dirname "$out")"
+    cp -p "$file" "$out"
+  done < <(find "$plugin_dir/agents" -type f | sort)
+}
+
 copy_codex_hook_lib() {
   local plugin_dir="$1" target_dir="$2" file rel out
   rm -rf "$target_dir/hooks"
@@ -224,6 +236,7 @@ generate_into() {
       mkdir -p "$target_dir/.codex-plugin"
       copy_codex_skills "$plugin_dir" "$target_dir"
       copy_codex_bin "$plugin_dir" "$target_dir"
+      copy_codex_agents "$plugin_dir" "$target_dir"
       copy_codex_hook_lib "$plugin_dir" "$target_dir"
       codex_plugin_payload "$manifest" "$name" > "$target_dir/.codex-plugin/plugin.json"
     else

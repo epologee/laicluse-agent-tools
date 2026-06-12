@@ -19,6 +19,8 @@ The marketplace currently ships:
 - `autonomous`: keep an autonomous mission running across turns. A startup
   capability probe decides whether keep-alive machinery (cron heartbeat,
   backoff, wake) is needed; persistent processes run without it.
+- `gurus`: opinionated review panels for code, decisions, and prose. The
+  orchestrator routes to the software, council, or writers panel.
 - `rover`: dispatch a rover at a task and stay back while it decides in the
   field: a phase machine with decide, pride/trim quality gates, verify
   evidence discipline, and a stop communique.
@@ -40,6 +42,7 @@ claude plugins install git-discipline@laicluse-agent-tools
 claude plugins install intervision@laicluse-agent-tools
 claude plugins install anger-management@laicluse-agent-tools
 claude plugins install autonomous@laicluse-agent-tools
+claude plugins install gurus@laicluse-agent-tools
 claude plugins install rover@laicluse-agent-tools
 claude plugins install clipboard@laicluse-agent-tools
 claude plugins install laicluse@laicluse-agent-tools
@@ -55,6 +58,7 @@ codex plugin add git-discipline@laicluse-agent-tools
 codex plugin add intervision@laicluse-agent-tools
 codex plugin add anger-management@laicluse-agent-tools
 codex plugin add autonomous@laicluse-agent-tools
+codex plugin add gurus@laicluse-agent-tools
 codex plugin add rover@laicluse-agent-tools
 codex plugin add clipboard@laicluse-agent-tools
 codex plugin add laicluse@laicluse-agent-tools

@@ -64,6 +64,8 @@ The decision framework lives in `rover` (invoked as `/rover:...`). Install both
 together; `rover` additionally depends on `gurus` for its INSPECT panel review:
 
 ```bash
-claude plugins install autonomous@laicluse-agent-tools rover@laicluse-agent-tools
-claude plugins install gurus@leclause
+claude plugins install autonomous@laicluse-agent-tools rover@laicluse-agent-tools gurus@laicluse-agent-tools
+codex plugin add autonomous@laicluse-agent-tools
+codex plugin add rover@laicluse-agent-tools
+codex plugin add gurus@laicluse-agent-tools
 ```

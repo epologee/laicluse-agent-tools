@@ -16,15 +16,18 @@ that needs a heartbeat to stay alive? The caller no longer has to know or say.
 
 - **`autonomous@laicluse-agent-tools`** (same marketplace): the keep-alive
   layer. The rover invokes `autonomous:keepalive` at dispatch.
-- **`gurus@leclause`**: the rover invokes `gurus:gurus` once per mission at
-  INSPECT for opinionated panel review; the orchestrator routes to
-  `gurus:software`, `gurus:council`, or any future panel.
+- **`gurus@laicluse-agent-tools`** (same marketplace): the rover invokes
+  `gurus:gurus` once per mission at INSPECT for opinionated panel review; the
+  orchestrator routes to `gurus:software`, `gurus:council`, `gurus:writers`,
+  or any future panel.
 
 Install together:
 
 ```bash
-claude plugins install rover@laicluse-agent-tools autonomous@laicluse-agent-tools
-claude plugins install gurus@leclause
+claude plugins install rover@laicluse-agent-tools autonomous@laicluse-agent-tools gurus@laicluse-agent-tools
+codex plugin add rover@laicluse-agent-tools
+codex plugin add autonomous@laicluse-agent-tools
+codex plugin add gurus@laicluse-agent-tools
 ```
 
 **Host contract for persistent runs.** The keep-alive probe treats `CronCreate`

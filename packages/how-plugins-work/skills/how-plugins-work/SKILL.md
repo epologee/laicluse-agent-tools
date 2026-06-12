@@ -65,7 +65,6 @@ Codex combine them in different ways in different places.
 | TUI autocomplete | `/<plugin>:<skill>` | `/how-plugins-work:how-plugins-work` |
 | Skill tool invocation | `Skill("<plugin>:<skill>")` or bare `Skill("<skill>")` | `Skill("how-plugins-work")` |
 | Slash command (bare) | `/<skill>` (if unique) | `/how-plugins-work` |
-| `claude agents` | `<plugin>:<name> · <model>` | `gurus:sonnet-max · sonnet` |
 | Agent tool invocation | `subagent_type: "<plugin>:<name>"` | `subagent_type: "gurus:sonnet-max"` |
 | Plugin-shipped agent source | `packages/<plugin>/agents/<name>.md` | `packages/gurus/agents/sonnet-max.md` |
 
@@ -231,6 +230,10 @@ Minimum copy rules:
 
 - Copy `bin/` into the generated target when a skill calls plugin helper
   commands.
+- Copy `agents/` into the generated target when the source plugin ships
+  plugin-level subagent definitions. Do not invent an unsupported Codex
+  manifest key for them; keep the directory as part of the plugin root payload
+  and let each runtime load what it understands.
 - Copy skill-local support files that live under `skills/<skill>/` alongside
   the materialized `SKILL.md`.
 - Copy `hooks/lib/` when Codex-facing workflows install git-native hooks or
@@ -311,18 +314,27 @@ Plugin-shipped agents follow the same `<plugin>:<name>` namespace as skills. Cal
 
 ### Verification without pushing
 
-Three levels, from lightest to heaviest:
+Do not use `claude agents` as a plugin-shipped-agent listing check. In current
+Claude Code CLI builds, `claude agents` manages background agent sessions, and
+`claude agents --json` prints active/completed sessions rather than the
+plugin-shipped subagent catalog.
 
-1. **`claude agents`.** Shows all loaded agents in `<plugin>:<name> · <model>` format. Runs against the current install cache; only works after a successful `claude plugin update`.
-2. **`claude --plugin-dir ./packages/<plugin> agents`.** Loads the local plugin for one CLI session without mutating the install cache. Fastest way to test a change before commit/install. Note: the `--plugin-dir` flag is global; `claude agents --plugin-dir X` fails with `unknown option`, `claude --plugin-dir X agents` works.
-3. **Live spawn test via `claude -p`.**
+Three useful checks, from lightest to heaviest:
+
+1. **`claude plugins validate packages/<plugin>`.** Catches manifest and hook
+   schema problems in the local package. It does not prove the agent can spawn.
+2. **Live local spawn test via `claude -p --plugin-dir ./packages/<plugin>`.**
 
    ```bash
-   claude -p --allow-dangerously-skip-permissions --output-format json \
+   claude -p --plugin-dir ./packages/<plugin> \
+     --allow-dangerously-skip-permissions --output-format json \
      "Use the Task tool with subagent_type '<plugin>:<name>'. Ask for the string PING_42."
    ```
 
    The JSON output contains a `modelUsage` section with the configured model as a separate key (e.g. `claude-sonnet-4-6`). Two models in `modelUsage` (session + subagent) is the strongest evidence that the subagent was truly spawned with the desired model. The `effort` value is not visible in `modelUsage` or elsewhere in the CLI output; for that it rests on a documentation assumption.
+3. **Installed-cache live spawn test.** After `claude plugins update
+   <plugin>@<marketplace>` or a fresh install, run the same `claude -p` command
+   without `--plugin-dir` to verify the installed cache copy.
 
    **What `claude -p` does and does not test for cron-driven features.** Print mode is one-shot: one prompt, one answer, session over. The cron itself does not fire in `-p` (it lives on an idle interactive REPL), so auto-triggering ticks is ruled out. What `-p` can do well: test per-tick behavior by supplying a pre-constructed state and asking the session to "follow the Instructions for the current Phase as if a tick was fired". For the autonomous rover: write a stub loopfile with the desired Phase and (optionally) an aged timestamp in the Log, then start `claude -p "Read .autonomous/X.md and act on the current Phase as if a cron tick just fired."`. That validates fuse/timeout/backoff logic without waiting for real wallclock. To also confirm cron-firing itself, fall back to a fresh interactive session (`claude` in a new terminal or iTerm2 pane). Claude has shell access and can spawn `-p` itself; do not dictate this to the user when you can run it yourself.
 

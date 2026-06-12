@@ -20,6 +20,19 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 The helper writes the sentinel only when stdout is non-empty, so a CHANGELOG
 without a `## [vX.Y.Z]` section stays silent on every update.
 
+## [v2.0.13]
+
+### Changed
+
+- **Generated Codex payloads now call out plugin `agents/`.** When a source
+  package ships plugin-level subagent definitions and the Codex adapter points
+  at `.agents/plugins/generated/<plugin>`, the generated root must carry
+  `agents/` alongside `skills/` and `bin/`.
+- **The Claude subagent verification note no longer claims `claude agents`
+  lists plugin-shipped agents.** Current Claude Code uses that command for
+  background agent sessions; use `claude plugins validate` for schema and a
+  live `claude -p --plugin-dir ...` Task-spawn for runtime proof.
+
 ## [v2.0.5]
 
 ### Changed
