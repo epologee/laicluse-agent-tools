@@ -10,9 +10,9 @@ The operator just cursed "wtf" at the session. This is a capture, not a request
 to fix anything now: log it cheap and get back to work. The constructive pass happens
 later via `/anger-management:repair`.
 
-The commands below live in this plugin's `bin/` directory. In Claude Code the root is
-`${CLAUDE_PLUGIN_ROOT}`; in another agent, resolve the plugin root from where this
-skill file was loaded (two directories up) and substitute it.
+The commands below live in this plugin's `bin/` directory. Resolve the loaded
+plugin root first; Claude Code exposes `${CLAUDE_PLUGIN_ROOT}`, and Codex exposes
+the install path through `codex plugin list`.
 
 1. Distil what actually set them off into a plain one-line pointer of at most a dozen
    words. Point at what happened (the thing the agent or workflow did), not at the
@@ -20,18 +20,44 @@ skill file was loaded (two directories up) and substitute it.
    shell touching the text, even if it echoes something hostile):
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/bin/anger-log" wtf <<'CAPTURE_NOTE'
+   resolve_anger_plugin_root() {
+     if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+       printf '%s\n' "$CLAUDE_PLUGIN_ROOT"
+       return 0
+     fi
+     if command -v codex >/dev/null 2>&1; then
+       codex plugin list | awk '$1 == "anger-management@laicluse-agent-tools" { print $NF; found=1; exit } END { exit found ? 0 : 1 }'
+       return $?
+     fi
+     return 1
+   }
+
+   PLUGIN_ROOT="$(resolve_anger_plugin_root)" || { echo "anger-management plugin root not found" >&2; exit 1; }
+   node "$PLUGIN_ROOT/bin/anger-log" wtf <<'CAPTURE_NOTE'
    <pointer>
    CAPTURE_NOTE
    ```
 
    No clear cause? Log the word alone, do not invent one:
-   `node "${CLAUDE_PLUGIN_ROOT}/bin/anger-log" wtf </dev/null`
+   use the same command with `</dev/null` instead of the heredoc.
 
 2. Arm the cooled-down repair so the operator never has to remember it:
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/bin/anger-arm"
+   resolve_anger_plugin_root() {
+     if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+       printf '%s\n' "$CLAUDE_PLUGIN_ROOT"
+       return 0
+     fi
+     if command -v codex >/dev/null 2>&1; then
+       codex plugin list | awk '$1 == "anger-management@laicluse-agent-tools" { print $NF; found=1; exit } END { exit found ? 0 : 1 }'
+       return $?
+     fi
+     return 1
+   }
+
+   PLUGIN_ROOT="$(resolve_anger_plugin_root)" || { echo "anger-management plugin root not found" >&2; exit 1; }
+   node "$PLUGIN_ROOT/bin/anger-arm"
    ```
 
    Single-flight: it starts a background investigation only if none is pending and
