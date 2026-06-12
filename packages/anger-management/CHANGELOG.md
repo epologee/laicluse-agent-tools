@@ -20,6 +20,15 @@ omitted; the broadcast budget is for things the user benefits from knowing.
 The helper writes the sentinel only when stdout is non-empty, so a CHANGELOG
 without a `## [vX.Y.Z]` section stays silent on every update.
 
+## [v2.0.6]
+
+### Changed
+
+- **Repair now has a confidence gate.** The cooled-down diagnosis reads the
+  full capture history, emits a confidence score plus mitigation level, and
+  only proposes a fix at `0.80` confidence or higher. Lower-confidence findings
+  leave the captures open so future passes keep the breadcrumb trail.
+
 ## [v2.0.3]
 
 ### Breaking

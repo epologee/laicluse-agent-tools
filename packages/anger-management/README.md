@@ -6,9 +6,9 @@ When the agent does something that sets you off, you do not want a lecture and y
 not want to drop everything to fix it. So you curse: `/fuck`, `/fucking`, `/fucked`,
 `/shit`, `/crap`, `/wtf`, `/bullshit`. Each one captures a single cheap line about what happened and
 gets out of your way. Later, cooled off, `/anger-management:repair` looks at the pile,
-decides whether there is one concrete recurring thing worth fixing, and if so routes it
-to `/self-improvement`. If there is nothing clear, it changes nothing. That restraint
-is the point.
+decides whether there is one concrete recurring thing worth fixing, scores its own
+confidence, chooses the mitigation layer, and only routes a fix when confidence is high.
+If there is nothing clear, it leaves the trail open. That restraint is the point.
 
 ## The idea, in one breath
 
@@ -45,9 +45,12 @@ The vocabulary avoids slurs and identity-targeted abuse.
    `/anger-management:repair`. Either way, ignoring it just leaves the captures open.
 3. **Repair (on your terms).** `/anger-management:repair` opens with a blunt verdict:
    *nothing* (change nothing, and that is fine), *not-enough-signal* (leave it open to
-   accumulate), or *fix* (one concrete recurring thing plus the specific change). A real
-   fix gets routed to `/self-improvement`. Crucially, the fix is often a *revert or
-   loosen* of a past rule that overcorrected, not another rule piled on.
+   accumulate), or *fix* (one concrete recurring thing plus the specific change). Every
+   verdict carries a confidence score and mitigation level. The threshold for a fix is
+   `0.80`, so weak guesses stay as breadcrumbs for a future pass instead of becoming
+   config churn. For now, a high-confidence fix can still be handed to
+   `/self-improvement` as the execution backend, but anger-management owns the pattern
+   judgement and target-layer choice.
 
 Because the pile is global and every repair reads the whole open set, deferring makes
 the diagnosis better: curse in one session, again two hours later in another, and they
@@ -58,7 +61,9 @@ land in the same pile and get weighed together.
 You mostly curse when a behaviour comes back *despite* earlier self-improvements. So a
 curse is also a signal that a previous fix added noise or swung too far. If the verdict
 is not clearly actionable and we change config anyway, that is noise-reflex busywork
-that fools everyone. So the default is to change nothing unless the pattern is concrete.
+that fools everyone. So the default is to change nothing unless the pattern is concrete,
+recurring, and above the confidence threshold. Below that line, the right action is to
+keep the captures open so the next pass has more evidence.
 
 ## The thinking behind it (research spine)
 
