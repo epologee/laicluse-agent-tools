@@ -65,6 +65,18 @@
       "category": "Productivity"
     },
     {
+      "name": "laicluse",
+      "source": {
+        "source": "local",
+        "path": "./.agents/plugins/generated/laicluse"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
       "name": "autonomous",
       "source": {
         "source": "local",

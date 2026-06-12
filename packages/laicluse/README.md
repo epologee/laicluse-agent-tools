@@ -1,0 +1,25 @@
+# laicluse
+
+Marketplace-wide utilities for the laicluse-agent-tools marketplace.
+
+## Commands
+
+### `/laicluse:whats-new [plugin-name]`
+
+With a plugin name (e.g. `git-discipline`): reprints the latest CHANGELOG
+section of that installed plugin without touching its broadcast sentinel,
+so the regular post-update broadcast still fires exactly once.
+
+Without arguments: prints the latest marketplace-wide news from
+`MARKETPLACE-CHANGELOG.md` plus an index of installed plugins that ship a
+per-plugin CHANGELOG.
+
+## Installation
+
+```bash
+claude plugins install laicluse@laicluse-agent-tools
+```
+
+Coming from `leclause-skills`: `/leclause:whats-new` keeps working for
+plugins that remain on the legacy marketplace; this plugin covers the
+`@laicluse-agent-tools` installs.

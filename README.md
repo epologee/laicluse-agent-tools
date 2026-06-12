@@ -24,6 +24,9 @@ The marketplace currently ships:
   evidence discipline, and a stop communique.
 - `clipboard`: copy the core content of the last answer to the macOS
   clipboard. Plain text by default, `/clipboard slack` for rich text.
+- `laicluse`: marketplace-wide utilities. `/laicluse:whats-new [plugin]`
+  re-reads the latest CHANGELOG section of any installed plugin, or the
+  marketplace-wide news without arguments.
 
 ## Installation
 
@@ -39,6 +42,7 @@ claude plugins install anger-management@laicluse-agent-tools
 claude plugins install autonomous@laicluse-agent-tools
 claude plugins install rover@laicluse-agent-tools
 claude plugins install clipboard@laicluse-agent-tools
+claude plugins install laicluse@laicluse-agent-tools
 ```
 
 Codex:
@@ -53,6 +57,7 @@ codex plugin add anger-management@laicluse-agent-tools
 codex plugin add autonomous@laicluse-agent-tools
 codex plugin add rover@laicluse-agent-tools
 codex plugin add clipboard@laicluse-agent-tools
+codex plugin add laicluse@laicluse-agent-tools
 ```
 
 If you still use older `@leclause` plugins, keep that marketplace installed

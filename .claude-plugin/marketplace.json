@@ -33,6 +33,11 @@
       "source": "./packages/anger-management"
     },
     {
+      "name": "laicluse",
+      "description": "Marketplace-wide utilities for the laicluse-agent-tools marketplace. Currently ships /laicluse:whats-new, a one-stop reader for the post-update CHANGELOG section of any installed laicluse-agent-tools plugin.",
+      "source": "./packages/laicluse"
+    },
+    {
       "name": "autonomous",
       "description": "Keep an autonomous mission running across turns. A startup capability probe decides whether keep-alive machinery is needed: a cron heartbeat with exponential backoff, auto-stop, and wake/restore for an interactive session; nothing for a persistent process. The rover plugin's decision framework calls this layer at dispatch.",
       "source": "./packages/autonomous"
