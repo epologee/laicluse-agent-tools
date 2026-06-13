@@ -8,6 +8,13 @@ new plugins joining, plugins leaving, marketplace-level
 conventions, shared infrastructure, and breaking changes that
 span multiple plugins.
 
+## [2026-06] dont-do-that moved from leclause
+
+`dont-do-that` now ships as `dont-do-that@laicluse-agent-tools`. Claude Code
+keeps the guardrail hook stack; Codex receives `/duh` and `/just-a-question`
+through the generated adapter package. Install the successor, then uninstall
+the legacy `dont-do-that@leclause` copy.
+
 ## [2026-06] Marketplace live, eight plugins ported from leclause
 
 The public l'Aicluse Agent Tools marketplace now ships:

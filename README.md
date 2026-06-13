@@ -10,6 +10,8 @@ The marketplace currently ships:
   project code, or instruction files.
 - `git-discipline`: git workflow skills plus commit and push hooks for agent
   sessions and direct CLI commits.
+- `dont-do-that`: guardrail hooks for Claude Code plus `/duh` and
+  `/just-a-question` correction skills for Claude Code and Codex.
 - `intervision`: bring another coding agent in as a peer to review work just
   done or just discussed. Claude hands work to Codex; Codex hands work to
   Claude.
@@ -41,6 +43,7 @@ claude plugins marketplace add epologee/laicluse-agent-tools
 claude plugins install how-plugins-work@laicluse-agent-tools
 claude plugins install self-improvement@laicluse-agent-tools
 claude plugins install git-discipline@laicluse-agent-tools
+claude plugins install dont-do-that@laicluse-agent-tools
 claude plugins install intervision@laicluse-agent-tools
 claude plugins install anger-management@laicluse-agent-tools
 claude plugins install autonomous@laicluse-agent-tools
@@ -57,6 +60,7 @@ codex plugin marketplace add epologee/laicluse-agent-tools
 codex plugin add how-plugins-work@laicluse-agent-tools
 codex plugin add self-improvement@laicluse-agent-tools
 codex plugin add git-discipline@laicluse-agent-tools
+codex plugin add dont-do-that@laicluse-agent-tools
 codex plugin add intervision@laicluse-agent-tools
 codex plugin add anger-management@laicluse-agent-tools
 codex plugin add autonomous@laicluse-agent-tools

@@ -1,0 +1,135 @@
+# dont-do-that changelog
+
+The post-update broadcast (see `bin/check-broadcast`) shows the topmost
+section once per machine whenever the installed `version` in
+`.claude-plugin/plugin.json` changes. Entry headers record the version at
+which the entry was written; a pre-commit hook auto-bumps `plugin.json` on
+every commit, so the header may lag the shipped version. Header numbers are
+informational, the broadcast is positional. Use the `--force` flag on the
+helper to re-read at any time.
+
+Categories:
+
+- **Breaking**: user must adapt (renamed guards, changed escape tokens, hook
+  gates that now block previously-accepted output)
+- **Added**: new guard, new user-invocable skill, new escape hatch
+- **Changed**: non-breaking adjustments worth knowing about
+- **Fixed**: silent unless the bug was user-visible
+
+Patch-level fixes that change nothing the user can observe are intentionally
+omitted; the broadcast budget is for things the user benefits from knowing.
+Version numbers may therefore be non-contiguous. The helper writes the sentinel
+only when stdout is non-empty, so a CHANGELOG without a `## [vX.Y.Z]` section
+stays silent on every update.
+
+## [v2.0.1]
+
+### Breaking
+
+- **dont-do-that now ships from the public laicluse-agent-tools marketplace.**
+  It replaces `dont-do-that@leclause`; uninstall that copy if you still have it.
+
+### Changed
+
+- **The plugin is multi-agent packaged.** Claude Code receives the existing
+  guardrail hooks plus `/duh` and `/just-a-question`; Codex receives the two
+  skills through the generated adapter package. Claude-specific hooks do not
+  run in Codex.
+- **Broadcast state moved under `${LAICLUSE_HOME:-~/.laicluse}`.** The helper
+  reads the old `~/.claude/var/leclause` sentinel as a legacy fallback.
+
+## [v1.0.83]
+
+### Added
+
+- **New `prefer` Stop guard.** Hand back a bare option menu and it asks you to commit to a reasoned pick; mark your lean with 🅰️/🅱️ or 1️⃣/2️⃣ to pass, or escape with 🧭 (operator's call) / 🚧 (WIP).
+
+## [v1.0.81]
+
+### Fixed
+
+- **`no-code-comments` no longer flags `#` lines inside Ruby/shell heredocs.** A Markdown heading or embedded shell comment in a `<<~HTML` / `<<-EOS` / `<<'TAG'` body is content, not a code comment, and now passes; real comments after the heredoc closes are still caught.
+
+## [v1.0.71]
+
+### Changed
+
+- **`/duh` reference resolution updated.** The research-fallback step names `/inspire:inspire` as default with a fallback for sessions without it; the inviolable-gate check names `~/.claude/CLAUDE.md` as default and acknowledges harness equivalents.
+
+## [v1.0.68]
+
+### Fixed
+
+- **`followup` no longer fires on `gh api` as substring.** Filenames or echoed strings with `gh api` pass; the body deferral check now requires `--field`/`-f`/`--raw-field`/`-F` or `--input`, not the bare word `body` anywhere.
+
+## [v1.0.66]
+
+### Fixed
+
+- **`no-code-comments` only flags `#` or `//` at line start or after whitespace.** Ruby `Recipes#create`, bash `$foo#bar`, bare URLs like `let u = http://blabla;`, and Edit snippets that begin mid-string with a `#method` reference now pass.
+
+## [v1.0.64]
+
+### Added
+
+- **New Stop guard `estimate`.** Blocks assistant text that frames effort in hours, days, weeks, or months ("een paar uur werk", "a few days of work", "binnen een uur"). Drop the duration claim or use a concrete count; calendar and SLA phrasing passes. Escape: `🧭` or `🚧`.
+
+## [v1.0.59]
+
+### Added
+
+- **New PreToolUse:Bash guard `no-worktree-deploy`.** Blocks `ansible-playbook` when cwd is a git worktree, so branch state cannot land on shared infrastructure pre-merge. Read-only flags still pass (`--check`, `--syntax-check`, `--list-*`, `--version`, `--help`).
+
+## [v1.0.52]
+
+### Added
+
+- **New PreToolUse guard `no-code-comments`.** Blocks Edit, Write, MultiEdit that add a code comment to a programming-language file. Pass: `https?://` URL, `allow-comment: <reason>` (colon required), pragma at body start (`@ts-ignore`, `noqa`, ...), or shebang on line 1.
+
+### Note
+
+- **Doc comments (`///`, `//!`, `/** */`) count as comments** and are blocked. Use `allow-comment: generates API docs` if your Swift/Rust/JSDoc project relies on source-derived documentation.
+- **JSX (`.jsx`) and TSX (`.tsx`) are excluded** because text content between JSX tags can legitimately contain `//`. Plain `.js`/`.ts` files are still checked.
+
+## [v1.0.48]
+
+### Breaking
+
+- **`/do-that` is renamed to `/duh`.** Slash command, SKILL directory, and the sister Stop guard with its `[dont-do-that/duh]` error code flip together. Retrain muscle memory.
+
+## [v1.0.46]
+
+### Changed
+
+- **`/do-that` now covers declarations of inability.** After "I can't see this" or "I don't have access", `/do-that` signals: find a path via a different tool, wider scope, or `/inspire:inspire`. The skill names the lesson so it persists.
+
+## [v1.0.45]
+
+### Added
+
+- **New `/just-a-question` skill.** Marks a message as a question, not a request for change. Claude answers with read-only tools only; `Edit`, `Write`, and mutating Bash are off the table for the turn. Imperatives get named, not applied. `/do-that` is the exit.
+
+### Changed
+
+- **`/do-that` menu has no upper bound.** The "two or three options" cap is gone: every distinct candidate from the previous turn is listed, even ten, and the operator picks. Truncation counts as picking in disguise.
+- **`/do-that` no longer collapses options across actors.** Two candidates with different actors (operator vs assistant) used to rationalize as "already disambiguated, run mine". Both are now listed regardless of actor.
+
+## [v1.0.41]
+
+### Added
+
+- **New Stop guard `do-that`.** Blocks Stop when the assistant offers a
+  recipe (`Run \`cmd\``, `open the URL`) for an action it could have run
+  itself. Pass: run it, or prefix with `Instructie:` for an explicit
+  manual recipe. 🚧 skips this guard.
+- **New user-invocable skill `/do-that`.** Type `/do-that` when the
+  previous turn offered a recipe instead of executing; the skill resolves
+  the proposal and runs it. Multiple candidates trigger a numbered "A or
+  B?" prompt. Inviolable gates are not lifted.
+
+### Fixed
+
+- **`do-that` guard now matches real Dutch prose.** Pattern A's `[^.\n]`
+  hit the letter `n` between `je kunt` and `door` and never reached the
+  keyword; replaced with `[^.]`. The imperative pattern also now matches
+  after sentence terminators, not only after newlines.

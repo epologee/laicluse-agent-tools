@@ -18,6 +18,10 @@ During the transition:
   `git-discipline@laicluse-agent-tools`; the legacy name
   `gitgit@leclause` stays in place until the old marketplace can carry a
   plugin-specific migration stub.
+- The new canonical plugin name for dont-do-that is
+  `dont-do-that@laicluse-agent-tools`. It replaces
+  `dont-do-that@leclause`; Claude Code keeps the hook stack, while Codex gets
+  the correction skills through the generated adapter package.
 - The new canonical plugin name for self-improvement is
   `self-improvement@laicluse-agent-tools`.
 - The new canonical plugin name for intervision is
