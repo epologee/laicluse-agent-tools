@@ -7,36 +7,29 @@ subtraction-biased `trim` pass, and an evidence-discipline `verify` pass. The
 rover only reports done when the mission is solid.
 
 This is the decision framework half of the old `autonomous` plugin. The
-keep-it-running half (cron heartbeat, wake/restore) now lives in the
-`autonomous` plugin, and the rover asks it one question at startup through
-`autonomous:keepalive`: am I in a persistent process, or an interactive session
-that needs a heartbeat to stay alive? The caller no longer has to know or say.
+keep-it-running half (cron heartbeat, wake/restore, goal loops, persistent
+runners) is now a host-owned continuation concern. Rover records a loop file
+and tells the active agent to arrange whatever continuation mechanism that
+runtime supports; it does not hard-code one implementation.
 
 ## Dependencies
 
-- **`autonomous@laicluse-agent-tools`** (same marketplace): the keep-alive
-  layer. The rover invokes `autonomous:keepalive` at dispatch.
 - **`gurus@laicluse-agent-tools`** (same marketplace): the rover invokes
   `gurus:gurus` once per mission at INSPECT for opinionated panel review; the
   orchestrator routes to `gurus:software`, `gurus:council`, `gurus:writers`,
   or any future panel.
 
-`rover` is currently Claude Code-only. The generated Codex marketplace omits it
-until Codex has compatible keepalive and subagent dispatch paths for this
-workflow.
-
-Install together in Claude Code:
+Install together:
 
 ```bash
-claude plugins install rover@laicluse-agent-tools autonomous@laicluse-agent-tools gurus@laicluse-agent-tools
+claude plugins install rover@laicluse-agent-tools gurus@laicluse-agent-tools
+codex plugin add rover@laicluse-agent-tools
+codex plugin add gurus@laicluse-agent-tools
 ```
 
-**Host contract for persistent runs.** The keep-alive probe treats `CronCreate`
-availability as the interactive-vs-persistent signal. A host that runs missions
-as a persistent process (an Agent SDK run, a conveyor line) must withhold the
-cron tools, by adding `CronCreate`, `CronDelete`, and `CronList` to its
-disallowed-tools list; otherwise the probe reads the run as interactive and schedules
-an unused heartbeat. See `autonomous`'s `keepalive` skill for the full contract.
+Claude Code sessions that need a cron heartbeat can additionally install
+`autonomous@laicluse-agent-tools`; that plugin is one implementation of the
+continuation contract, not a rover dependency.
 
 No other hard dependencies. Optional integrations (notifier, reviewbot,
 commit-splitter) are user-named at invocation and only used when installed.
@@ -45,17 +38,18 @@ commit-splitter) are user-named at invocation and only used when installed.
 
 ### `/rover:rover [loop-file-path | free-form text]`
 
-Entry point. Accepts a loop file path to resume (delegates to `autonomous:wake`)
-or free-form mission text (a description, a pasted issue body, a GitHub URL).
-Writes `.autonomous/<NAME>.md` (the loop file), asks the autonomy layer whether a
-heartbeat is needed, and runs the first SURVEY iteration. The rover does not
-fetch remote content on its own; paste an issue body or PR diff into the
-invocation if it is part of the mission.
+Entry point. Accepts a loop file path to resume or free-form mission text (a
+description, a pasted issue body, a GitHub URL). Writes
+`.autonomous/<NAME>.md` (the loop file), records the host continuation
+mechanism if one is available, and runs the first SURVEY iteration. The rover
+does not fetch remote content on its own; paste an issue body or PR diff into
+the invocation if it is part of the mission.
 
 ### `/rover:stop [loop-file-path]`
 
-Cleanly stop a running mission. Cuts the cron (when one was scheduled), writes a
-final log entry, and transmits a mission-report communiqué.
+Cleanly stop a running mission. Cancels or marks the host continuation
+mechanism when one was recorded, writes a final log entry, and transmits a
+mission-report communiqué.
 
 ### `/rover:pride [git-range | uncommitted]`
 

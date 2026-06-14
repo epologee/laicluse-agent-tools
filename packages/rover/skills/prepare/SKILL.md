@@ -1,6 +1,6 @@
 ---
 name: prepare
-description: Lay a rover loop file in another repo's .autonomous/ now, so the operator can wake it later from inside that repo. Triggers on /rover:prepare. Writes the loop file and .gitignore with full mission context, but does not start the cron, create the mission branch, or run SURVEY. The operator drives those at wake time.
+description: Lay a rover loop file in another repo's .autonomous/ now, so the operator can wake it later from inside that repo. Triggers on /rover:prepare. Writes the loop file and .gitignore with full mission context, but does not start host continuation, create the mission branch, or run SURVEY. The operator drives those at wake time.
 user-invocable: true
 argument-hint: "mission brief and target repo (e.g. \"prepare this for the acme/foo rover\")"
 ---
@@ -28,7 +28,7 @@ The conversation up to this point is the source of mission context. The operator
 
 ## What it does
 
-1. **Resolve target repo path.** Accept an absolute path, a tilde-expanded path, or a relative path (`./`, `../`, or anything containing a `/`). Anything else (a bare name, an `owner/repo` slug, a phrase) is not a path; ask the operator for an explicit one (this is the only case prepare halts for input, it has nothing else to fall back on). Operators who want slug-style invocation can document a personal mapping in their own CLAUDE.md or a shell function; the skill itself stays neutral about clone layout. Verify the resolved path has `.git/`. If not, surface the error and stop.
+1. **Resolve target repo path.** Accept an absolute path, a tilde-expanded path, or a relative path (`./`, `../`, or anything containing a `/`). Anything else (a bare name, an `owner/repo` slug, a phrase) is not a path; ask the operator for an explicit one (this is the only case prepare halts for input, it has nothing else to fall back on). Operators who want slug-style invocation can document a personal mapping in their active agent instructions or a shell function; the skill itself stays neutral about clone layout. Verify the resolved path has `.git/`. If not, surface the error and stop.
 
 2. **Distil mission `<NAME>`.** ALL-CAPS, hyphens, no spaces. Goal not mechanism. Same conventions as rover. `ADD-RAW-SOURCES-SUPPORT.md` not `RAW-SOURCES-CLI-WORK.md`. Distil from the dispatch's action verbs.
 
@@ -38,7 +38,9 @@ The conversation up to this point is the source of mission context. The operator
 
 5. **Write `<repo>/.autonomous/<NAME>.md`** using the rover template, with these specifics:
    - `branch:` filled with the suggested kebab-case mission branch name
-   - `cron_job_id:` empty
+   - `continuation: none (prepared; wake with /rover:rover)`
+   - `continuation_handle:` empty
+   - `legacy_cron_job_id:` empty
    - `watch_checks: 0`
    - Phase: SURVEY
    - Dispatch: verbatim brief from the operator's invocation argument, plus any directly relevant operator quotes from the conversation that frame the intent. Mark the source of each quote.
@@ -52,9 +54,9 @@ The conversation up to this point is the source of mission context. The operator
    - Done criteria: leave as the placeholder line.
    - Decision Audit Trail: empty header row only.
    - Input: empty placeholder.
-   - Log: one entry timestamped from `date +%H:%M`, recording that the file was prepared in advance via prepare from another session, cron is not running yet, mission branch is not created yet, and how the operator picks it up. Example:
+   - Log: one entry timestamped from `date +%H:%M`, recording that the file was prepared in advance via prepare from another session, continuation is not running yet, mission branch is not created yet, and how the operator picks it up. Example:
      ```
-     [HH:MM prepare] Prepared in advance by /rover:prepare. Cron NOT running, mission branch NOT created. Operator picks up by: cd <repo> && git checkout -b <branch>, then /rover:rover .autonomous/<NAME>.md.
+     [HH:MM prepare] Prepared in advance by /rover:prepare. Continuation NOT running, mission branch NOT created. Operator picks up by: cd <repo> && git checkout -b <branch>, then /rover:rover .autonomous/<NAME>.md.
      ```
    - Instructions: same canonical block as rover (Phases, Decisions, Interjections, Commits and pushes, Timestamps, Source of truth).
 
@@ -63,14 +65,14 @@ The conversation up to this point is the source of mission context. The operator
    cd <repo>
    git checkout -b <branch>
    ```
-   Followed in a Claude session in that repo by:
+   Followed in an agent session in that repo by:
    ```
    /rover:rover .autonomous/<NAME>.md
    ```
 
 ## What it does not do
 
-- Does not invoke the autonomy layer (`autonomous:keepalive` or `autonomous:cron`). No `CronCreate`. The mission lies dormant until wake.
+- Does not arrange host continuation. The mission lies dormant until wake.
 - Does not create the mission branch in the target repo. The operator does that when they pick the mission up.
 - Does not commit anything in either repo.
 - Does not push.
@@ -79,9 +81,9 @@ The conversation up to this point is the source of mission context. The operator
 
 ## Why split out from rover
 
-Rover's setup contract assumes: I am dispatched here, I run here. Setup steps 1 through 6 (cron, branch, leftovers, gitignore, loop file, first SURVEY) all happen now in the cwd. That contract is wrong for the case where the conversation context belongs to one repo (or no repo at all, like a session in `~/.claude`), but the mission target is somewhere else.
+Rover's setup contract assumes: I am dispatched here, I run here. Setup steps 1 through 6 (continuation, branch, leftovers, gitignore, loop file, first SURVEY) all happen now in the cwd. That contract is wrong for the case where the conversation context belongs to one repo (or no repo at all), but the mission target is somewhere else.
 
-Prepare strips setup down to the minimum needed for the operator to pick the mission up later from inside the target repo: the loop file with full context, plus `.gitignore`. Everything else (cron, mission branch, leftovers, first SURVEY) is rover's job at pickup time. The pickup command is `/rover:rover .autonomous/<NAME>.md`; rover detects the path argument and delegates to the autonomy layer's `autonomous:wake` skill (which is not user-invocable on its own).
+Prepare strips setup down to the minimum needed for the operator to pick the mission up later from inside the target repo: the loop file with full context, plus `.gitignore`. Everything else (host continuation, mission branch, leftovers, first SURVEY) is rover's job at pickup time. The pickup command is `/rover:rover .autonomous/<NAME>.md`; rover detects the path argument, reads the file, arranges host continuation if available, and continues the phase machine from the file's current state.
 
 ## Optional integrations
 

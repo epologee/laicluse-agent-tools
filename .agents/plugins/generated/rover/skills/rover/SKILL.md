@@ -1,9 +1,6 @@
 ---
 name: rover
 description: Dispatch a rover at a task. You stay back, the rover works in the field and decides autonomously. Accepts a loop file path to wake, or free-form text (a GitHub URL, a description, anything) describing the mission.
-user-invocable: true
-argument-hint: "standing by for mission parameters..."
-effort: high
 ---
 
 <post-update-broadcast>
@@ -65,7 +62,7 @@ The failure mode: driving halfway, stopping at the arbitrary halt, entering STAN
 
 A friction-point mid-mission is not a STANDBY trigger. The reflex pattern: the rover hits a sub-task that needs a tool (capture a screenshot for the Visual trailer, transcribe an audio file, render a diagram, generate test data, talk to a database), tries the first tool that comes to mind, finds it needs setup or is not loaded, reverts the in-flight edit, logs "operator presence required for X", and backs off into STANDBY. Every step of that reflex feels like caution. It is not caution; it is the rover treating one failed branch as the whole tree.
 
-The reality: there are countless ways to do almost any sub-task. Every Claude Code session loads its own mix of skills, MCP servers, and CLIs, and the host machine carries its own history of installed tooling and prior projects. The right route is whichever already works in this specific environment, or the one you set up in the time it would take to write a deferral. Before declaring a tool-gap that justifies STANDBY, look around: scan the loaded skill descriptions for the capability, scan the deferred-tools list for something loadable, scan PATH and the package manager, scan sibling projects under `~/github.com/` for prior solutions to the same problem. Do not enumerate a fixed menu; enumerate whatever this machine actually has.
+The reality: there are countless ways to do almost any sub-task. Every agent session loads its own mix of skills, MCP servers, CLIs, and host tools, and the host machine carries its own history of installed tooling and prior projects. The right route is whichever already works in this specific environment, or the one you set up in the time it would take to write a deferral. Before declaring a tool-gap that justifies STANDBY, look around: scan the loaded skill descriptions for the capability, scan the deferred-tools list for something loadable, scan PATH and the package manager, scan sibling projects under `~/github.com/` for prior solutions to the same problem. Do not enumerate a fixed menu; enumerate whatever this machine actually has.
 
 STANDBY on a tool-gap is only legitimate when that look-around produces zero candidates. Two failed tools is two failed tools, not a search. If a candidate needs setup, the setup is a DRIVE task of the same order as any other; do the setup, take the longer path, keep the in-flight edit. Reverting the working tree to a clean state because the tooling for one sub-task needs setup is the radio-delay failure mode in a different costume.
 
@@ -115,25 +112,45 @@ When the context is ambiguous: default to LESS infrastructure, not more. A scrat
 
 You type `/rover:rover "build the settings page"`. In response:
 
-1. Claude writes `.autonomous/.gitignore` and `.autonomous/BUILD-SETTINGS-PAGE.md` (the loop file holds the full plan and progress).
-2. Claude asks the autonomy layer (`autonomous:keepalive`) whether it needs to keep itself alive. In an interactive TUI it does, so keepalive starts a `CronCreate` job that re-enters this conversation every minute while the REPL is idle, carrying a prompt that tells Claude to read the loop file and act on the current phase. In a persistent process (a detached Agent SDK run, a conveyor line) keepalive schedules nothing; the process drives the phase machine to completion in one run.
-3. Claude immediately runs the first SURVEY iteration in the same turn, so you see work happening right away. Reading files, searching the codebase, forming a plan.
-4. Between your turns, the cron ticks (interactive sessions only). Every tick is Claude reading the loop file and either doing the next chunk of work or logging "nothing to do."
+1. The active agent writes `.autonomous/.gitignore` and
+   `.autonomous/BUILD-SETTINGS-PAGE.md` (the loop file holds the full plan and
+   progress).
+2. The active agent records how this host will keep the mission moving:
+   persistent process, Claude cron, Codex goal loop, external scheduler, or
+   "none available, drive in this turn".
+3. The active agent immediately runs the first SURVEY iteration in the same
+   turn, so you see work happening right away. Reading files, searching the
+   codebase, forming a plan.
+4. After that, whichever continuation mechanism the host owns re-enters the
+   loop file and asks the active agent to continue the current phase.
 
 The loop file is your window. `.autonomous/BUILD-SETTINGS-PAGE.md` gets a timestamped log line on every action. Tail it to watch progress.
 
 ## How to steer a running loop
 
-- You can keep chatting in the same session. Your messages take priority; the cron waits for the REPL to be idle.
+- You can keep chatting in the same session. Your messages take priority; the
+  host continuation mechanism only resumes the loop when that is safe for the
+  runtime.
 - To inject guidance without interrupting mid-work: open the loop file and add text under `## Input`. The loop reads this section each STANDBY iteration and acts on it.
-- To stop: type `/rover:stop`. The loop cancels its cron and gives you a recap.
-- To resume after you closed Claude and came back: type `/rover:rover .autonomous/<NAME>.md`. Crons are session-scoped; they do not survive restarts. Wake recreates a fresh cron from the file's state.
+- To stop: type `/rover:stop`. The loop marks or cancels its continuation and
+  gives you a recap.
+- To resume after a session restart: type
+  `/rover:rover .autonomous/<NAME>.md`. The active host arranges a fresh
+  continuation path from the file's state when one is available.
 
 ## What you are building
 
-A markdown file in `.autonomous/` that holds context, phase, plan, decision audit, and log. In an interactive session, a Claude Code cron job that fires the loop prompt every minute while the REPL is idle. A phase machine (optional PRELAUNCH, then SURVEY, DRIVE, INSPECT, STOW, STANDBY) that each cron tick advances.
+A markdown file in `.autonomous/` that holds context, phase, plan, decision
+audit, continuation metadata, and log. A phase machine (optional PRELAUNCH,
+then SURVEY, DRIVE, INSPECT, STOW, STANDBY) that the active host advances by
+re-entering this skill with the loop-file path.
 
-**Interactive or persistent: the autonomy layer decides, not the caller.** At setup the rover invokes `autonomous:keepalive`, which probes the runtime and either schedules a cron heartbeat (interactive session) or schedules nothing and lets the rover drive to completion (persistent process). The caller never has to tell the rover which mode it is in or instruct it to "skip the cron"; the probe makes that call. Either way the loop-file discipline is identical, so an interactive session can `wake` a dropped mission later. See `autonomous:keepalive` for the probe and its one load-bearing assumption.
+**Continuation is host-owned.** Rover does not depend on one keepalive
+implementation. The active agent inspects its runtime and records the best
+available continuation path: a persistent process that keeps driving, a Claude
+cron/wake helper, a Codex goal or work-loop mechanism, a scheduler, or no
+continuation. The loop-file discipline is identical either way; a future
+session can resume by invoking `/rover:rover .autonomous/<NAME>.md`.
 
 Phases and transitions:
 
@@ -144,7 +161,12 @@ PRELAUNCH ──► SURVEY ──► DRIVE ──► INSPECT ──► STOW ─�
                   └──────── new issues ────────────────────────┘
 ```
 
-PRELAUNCH is optional and only written to the loop file when setup step 2 surfaces a human question the rover cannot answer itself; otherwise the loop file is born at Phase: SURVEY. The PRELAUNCH phase has a hard five-minute fuse: if the cron finds a PRELAUNCH loop file whose logged question is five minutes or older without an operator answer in `## Input`, the rover decides the question itself via `decide` and drives on.
+PRELAUNCH is optional and only written to the loop file when setup surfaces a
+human question the rover cannot answer itself; otherwise the loop file is born
+at Phase: SURVEY. The PRELAUNCH phase has a hard five-minute fuse: if a
+continuation tick finds a PRELAUNCH loop file whose logged question is five
+minutes or older without an operator answer in `## Input`, the rover decides
+the question itself via `decide` and drives on.
 
 The loop is autonomous. It does not ask questions mid-phase. When it hits a choice, it invokes `decide`. Before any artefact leaves the rover (push, PR, handoff communiqué, research brief, generated doc, media, or any other deliverable), it invokes `pride` to catch what it missed. No human is required to keep it moving, but you can intervene via the `## Input` section or the `/rover:stop` and `/rover:rover` commands at any time.
 
@@ -229,7 +251,7 @@ There is one narrow exception: an item whose resolution would require editing co
 
 ## Cost awareness
 
-A cron at one-minute cadence drives many Claude turns. During active SURVEY/DRIVE/INSPECT/STOW phases that is the point: the loop is working on your behalf. During STANDBY the backoff progresses to 60-minute intervals and auto-stops after roughly 5 hours of sustained idleness. If your task is small, consider whether `/rover:rover` is right for it, or whether an ordinary conversation is cheaper.
+An autonomous continuation can drive many agent turns. During active SURVEY/DRIVE/INSPECT/STOW phases that is the point: the loop is working on your behalf. During STANDBY the host-owned continuation should back off and eventually stop after sustained idleness. If your task is small, consider whether `/rover:rover` is right for it, or whether an ordinary conversation is cheaper.
 
 ## Verification
 
@@ -239,9 +261,11 @@ The rover invokes `verify --propose` at the end of SURVEY to write Done criteria
 
 The rover runs without asking the operator mid-mission. Prelaunch is the interval between this skill loading and the mission branch being established in setup step 2 (whether by creating a new branch or by continuing on the operator's current branch); that is the rover's one window to ask the operator a question or a short batch of questions, and only when the mission parameters contain a human choice that `decide` and `pride` cannot stand in for. Once setup step 2 settles the mission branch the rover has launched and "No user-feedback during a rover action. Forbidden." (top of this skill) is absolute again.
 
-Note that setup step 1 (the `autonomous:keepalive` probe, which may schedule a CronCreate heartbeat) fires before prelaunch closes. It is not an operator-visible action and does not consume the window; the no-git-repo question in step 2 is still prelaunch.
+Note that setup step 1 (the continuation setup) fires before prelaunch closes.
+It is not an operator-visible action and does not consume the window; the
+no-git-repo question in step 2 is still prelaunch.
 
-**The prelaunch question has a five-minute fuse.** Before asking the operator any prelaunch question, the rover pulls setup step 5 forward in stub form: `Write .autonomous/<NAME>.md` with the template below, `Phase: PRELAUNCH`, `branch:` empty, and a `[HH:MM] Prelaunch question: <summary>` line in the Log capturing the timestamp and the pending choice. Only then ask the operator. If the operator answers, the rover proceeds with steps 2 through 6 as normal and the Log records the answer. If the cron fires and finds a `Phase: PRELAUNCH` loop file whose prelaunch-question line is five minutes or more old with no operator answer in `## Input`, the rover does not keep waiting: it answers the question itself via `decide`, records the verdict in the Decision Audit Trail with classification `prelaunch-timeout`, flips the Phase out of PRELAUNCH, and drives the mission forward including executing whatever that decision implies (running `git init`, branch creation, leftover commits, all of it). Better to come back to a branch that made a couple of odd choices than to come back to a rover that never moved an inch. A rover stuck at a prompt has failed the one job of being autonomous. The five-minute fuse is the operator's courtesy window, not a gate; after it burns down, decide-and-execute is the rule.
+**The prelaunch question has a five-minute fuse.** Before asking the operator any prelaunch question, the rover pulls setup step 5 forward in stub form: `Write .autonomous/<NAME>.md` with the template below, `Phase: PRELAUNCH`, `branch:` empty, and a `[HH:MM] Prelaunch question: <summary>` line in the Log capturing the timestamp and the pending choice. Only then ask the operator. If the operator answers, the rover proceeds with steps 2 through 6 as normal and the Log records the answer. If a continuation tick finds a `Phase: PRELAUNCH` loop file whose prelaunch-question line is five minutes or more old with no operator answer in `## Input`, the rover does not keep waiting: it answers the question itself via `decide`, records the verdict in the Decision Audit Trail with classification `prelaunch-timeout`, flips the Phase out of PRELAUNCH, and drives the mission forward including executing whatever that decision implies (running `git init`, branch creation, leftover commits, all of it). Better to come back to a branch that made a couple of odd choices than to come back to a rover that never moved an inch. A rover stuck at a prompt has failed the one job of being autonomous. The five-minute fuse is the operator's courtesy window, not a gate; after it burns down, decide-and-execute is the rule.
 
 Use this window for things like:
 
@@ -255,7 +279,26 @@ Do not use it for technical choices. If two implementation paths are open, that 
 
 The first tool calls after this skill loads are:
 
-1. Invoke `autonomous:keepalive` via the Skill tool. Pass `.autonomous/<NAME>.md` as the loop-file path (derive `<NAME>` from the Dispatch the same way step 5 does: ALL-CAPS, hyphens, no spaces, goal not mechanism; no tool call needed for this, it comes out of reading the Dispatch text). Keepalive returns either a cron job id (an interactive session, heartbeat scheduled) or the sentinel `none (persistent process)`; hold that value in-session to write into the loop file's `cron_job_id` in step 5. How the probe decides is keepalive's business; see `autonomous:keepalive`. The probe goes first so that, in an interactive session, the heartbeat is the safety net during setup's generation-horizon hazards (the big template write in step 5 is the worst), not a consequence of surviving them. The loop file does not have to exist yet; an scheduled cron's Read is a no-op when the file is missing, and the next tick picks up once the file lands. If the prelaunch question in step 2 ends the mission (operator refuses the no-git-repo proposal) and a heartbeat was scheduled, invoke `autonomous:cron` with `CronDelete` on the returned id before stopping so the cron does not outlive the abort.
+1. Determine the loop-file name and arrange continuation through the host, not
+   through a rover dependency. Derive `<NAME>` from the Dispatch: ALL-CAPS,
+   hyphens, no spaces, goal not mechanism. Then choose the best available
+   continuation mode:
+   - **Persistent process:** record `continuation: in-process`; no heartbeat is
+     needed because this process can drive the phase machine to completion.
+   - **Host keepalive available:** ask the host/caller to re-enter this skill
+     with `.autonomous/<NAME>.md` when the session would otherwise go idle.
+     In Claude this may be a cron/wake helper; in Codex it may be a
+     goal/work-loop mechanism; in another host it may be a scheduler.
+     Record the implementation in `continuation:` and any opaque handle in
+     `continuation_handle:`.
+   - **No continuation available:** record
+     `continuation: none (drive current turn)`. Keep driving in this turn as
+     far as the runtime allows; the loop file still lets a future session
+     resume explicitly with `/rover:rover .autonomous/<NAME>.md`.
+   The continuation setup goes first so that every subsequent setup step lands
+   under the host's safety net when one exists. If the prelaunch question in
+   step 2 ends the mission, cancel or mark the continuation through the same
+   host mechanism before stopping.
 2. Establish the mission branch IF the context calls for it. The branch ceremony is conditional on the existing state of the working directory: a git repo is already present (`git rev-parse --show-toplevel` succeeds) AND the work the Dispatch describes is going to live as commits in that repo. When both hold, the rover decides which branch the mission lands on. **Never rewind to the default branch and never ask the operator about it.** Two paths follow.
 
    **HEAD is on the default branch.** Pick a kebab-case name from the loop-file name (no slashes, no prefixes, no rover or space-mission words: `fix-stale-cache`, `build-auth-page`, `investigate-slow-queries`) and run `git checkout -b <name>` directly from HEAD. This is the common case.
@@ -273,19 +316,32 @@ The first tool calls after this skill loads are:
    When the context does NOT call for git ceremony (no repo present, or the work is prose/visual/audio/generated media that does not live as code commits), skip this step entirely: record `branch: none (not a git repo)` or `branch: none (medium not code)` in step 5 and proceed. Never `git init` to satisfy the ceremony; the absence of a repo means the operator did not bring one. Step 5 stays unconditional regardless of which branch path runs here.
 3. Commit any leftover working tree changes on the mission branch. If `git status --short` is empty, skip. Otherwise invoke `commit-all-the-things` via the Skill tool to group the leftovers into logical commits with descriptive messages in the project's commit style, and log one line: `[HH:MM] ⚠️ Leftovers in the working tree, committed on mission branch: <one-line summary>.` That is the whole ceremony.
 4. Ensure `.autonomous/.gitignore` exists. One Write call: write `*` to `.autonomous/.gitignore`. Write creates the `.autonomous/` directory automatically and the content is fixed (`*`), so this is idempotent whether the file was already there or not. Do not use `mkdir`; the `block-bad-paths` hook rejects it because Write covers the directory-creation case.
-5. `Write .autonomous/<NAME>.md` with the template below, fully populated, including the `cron_job_id` returned in step 1 and the `branch` recorded in step 2. **Step 5 is unconditional.** If step 2 cannot complete because there is no git repo and the rover is waiting on the prelaunch question, pull step 5 forward as a stub: write the template with `Phase: PRELAUNCH`, `branch:` empty, and a `[HH:MM] Setup blocked: no git repo` line in the Log. The loop file must exist on disk before the rover stops for any reason, so `/rover:rover` can pick the mission up later and the cron has something to read on its next tick.
+5. `Write .autonomous/<NAME>.md` with the template below, fully populated,
+including the `continuation` and `continuation_handle` from step 1 and the
+`branch` recorded in step 2. **Step 5 is unconditional.** If step 2 cannot
+complete because there is no git repo and the rover is waiting on the prelaunch
+question, pull step 5 forward as a stub: write the template with
+`Phase: PRELAUNCH`, `branch:` empty, and a `[HH:MM] Setup blocked: no git repo`
+line in the Log. The loop file must exist on disk before the rover stops for
+any reason, so `/rover:rover` can pick the mission up later and the host
+continuation has something to read on its next tick.
 6. Run the first SURVEY iteration directly in this same turn
 
-No exploration first. No "let me check the codebase." Cron first, everything else after. The branch, .gitignore, and loop file all land under an already-running safety net. Exploration happens inside the loop.
+No exploration first. No "let me check the codebase." Continuation first,
+everything else after. The branch, .gitignore, and loop file all land under an
+already-arranged safety net when the host has one. Exploration happens inside
+the loop.
 
-The first iteration races with the cron's period. This is safe because cron only fires when the REPL is idle, and the first iteration blocks idle. But: tune the initial cron to `* * * * *` (every minute) regardless of expected SURVEY duration. If SURVEY takes 20 minutes, that is fine; the cron will not fire until you yield.
+The first iteration races with any host continuation tick. This is safe because
+a sane host only resumes the loop when the active turn has yielded. The
+continuation is the safety net after you stop driving, not the starter.
 
 ## Arguments
 
 | Argument | Meaning |
 |----------|---------|
 | (none) | Use the current conversation as context. Distill to 2-3 sentences. |
-| `.autonomous/<name>.md` | Wake. Delegate to `autonomous:wake`. |
+| `.autonomous/<name>.md` | Wake. Read the loop file, arrange fresh host continuation if available, and continue from the current Phase. |
 | Free-form text | Use the text directly as context. A bare GitHub URL falls in this category: paste it into the Dispatch verbatim. The rover never fetches remote content on its own; if issue body or PR diff is needed as context, the operator includes it in the invocation. |
 
 Free-form text may also describe optional integrations. Parse phrases where the operator names a specific skill with a role, and record it as an integration:
@@ -302,7 +358,11 @@ Choose a name: ALL-CAPS, hyphens, no spaces. Describe the goal, not the mechanis
 
 ### Canonical names
 
-- **Skill references** inside a loop file use the bare skill directory name for skills in this plugin (`rover`, `decide`, `pride`, `trim`, `verify`, `prepare`, `stop`) and the `plugin:skill` form for the autonomy layer (`autonomous:keepalive`, `autonomous:cron`, `autonomous:wake`). Never the user-facing slash form (`/rover:rover`).
+- **Skill references** inside a loop file use the bare skill directory name for
+  skills in this plugin (`rover`, `decide`, `pride`, `trim`, `verify`,
+  `prepare`, `stop`). Runtime-specific keepalive helpers are recorded under
+  `continuation`, not treated as rover skill dependencies. Never use the
+  user-facing slash form (`/rover:rover`) inside loop instructions.
 - **Optional integration values** use the slash form users type at invocation. That is what `has_skill` and Skill-tool invocations match on.
 
 Template:
@@ -311,8 +371,10 @@ Template:
 # <NAME>
 
 branch: <kebab-case mission branch, or "none (not a git repo)">
-cron_job_id: <set by autonomous:keepalive at setup; one of: a live job id | none (persistent process) | paused | stopped | failed>
-watch_checks: 0     # consecutive STANDBY ticks with nothing to do, drives idle backoff
+continuation: <in-process | host:<name> | none (drive current turn) | stopped | failed>
+continuation_handle: <opaque host-owned id, or empty>
+legacy_cron_job_id: <only for old loop files or a Claude cron implementation>
+watch_checks: 0     # consecutive STANDBY ticks with nothing to do, drives host backoff
 
 ## Integrations
 
@@ -365,7 +427,7 @@ You are an autonomous loop. Follow the phase machine below. No user-feedback dur
 ### Phases
 
 **PRELAUNCH**
-Only exists when setup step 2 surfaced a question the rover could not answer autonomously (the no-git-repo case) and pulled setup step 5 forward as a stub. The loop file's Log holds a `[HH:MM] Prelaunch question: <summary>` line. On every cron tick in this phase, run: read the Log, find the most recent `Prelaunch question:` line, parse its `HH:MM`, compare against `date +%H:%M`. If fewer than five minutes have elapsed and `## Input` is still empty, log `[HH:MM] PRELAUNCH: waiting (<N>m elapsed)` and stop the tick. If `## Input` has an operator answer, log it, apply it (run `git init -b main` or whichever setup command the answer called for, then create the mission branch and commit any leftover working tree changes), clear `## Input`, flip Phase to SURVEY, and run the first SURVEY iteration in the same tick. If five minutes or more have elapsed with `## Input` still empty, the fuse burns down: invoke `decide` on the pending question with classification `prelaunch-timeout`, record the verdict in the Decision Audit Trail, execute whatever that verdict implies (init, branch creation, leftover commits, and so on), log `[HH:MM] PRELAUNCH: fuse burned, decided <verdict>`, flip Phase to SURVEY, and run the first SURVEY iteration in the same tick. The rover never adds a new `Prelaunch question:` line after flipping out of PRELAUNCH; prelaunch is a one-shot phase.
+Only exists when setup step 2 surfaced a question the rover could not answer autonomously (the no-git-repo case) and pulled setup step 5 forward as a stub. The loop file's Log holds a `[HH:MM] Prelaunch question: <summary>` line. On every continuation tick or manual wake in this phase, run: read the Log, find the most recent `Prelaunch question:` line, parse its `HH:MM`, compare against `date +%H:%M`. If fewer than five minutes have elapsed and `## Input` is still empty, log `[HH:MM] PRELAUNCH: waiting (<N>m elapsed)` and stop the tick. If `## Input` has an operator answer, log it, apply it (run `git init -b main` or whichever setup command the answer called for, then create the mission branch and commit any leftover working tree changes), clear `## Input`, flip Phase to SURVEY, and run the first SURVEY iteration in the same tick. If five minutes or more have elapsed with `## Input` still empty, the fuse burns down: invoke `decide` on the pending question with classification `prelaunch-timeout`, record the verdict in the Decision Audit Trail, execute whatever that verdict implies (init, branch creation, leftover commits, and so on), log `[HH:MM] PRELAUNCH: fuse burned, decided <verdict>`, flip Phase to SURVEY, and run the first SURVEY iteration in the same tick. The rover never adds a new `Prelaunch question:` line after flipping out of PRELAUNCH; prelaunch is a one-shot phase.
 
 **SURVEY**
 Search the codebase. Read relevant files, tests, logs, errors. Form hypotheses. Verify with concrete evidence: a failing test, a trace, a grep result. Write findings to the Log. When the plan is concrete and verifiable, fill the Plan section, write a Mission Understanding paragraph (see below), run the Plan-vs-Dispatch check below, invoke `verify --propose` to generate Done criteria, then transition to DRIVE.
@@ -405,7 +467,7 @@ Run the check at three moments:
 Do not silently slide from "ship X" to "write a doc about X", not at setup, not at SURVEY end, not at DRIVE entry, not at INSPECT entry. Four gates, same question: are we delivering what the Dispatch asked for?
 
 **DRIVE**
-The mission branch was created at setup; stay on it. Read project CLAUDE.md and user CLAUDE.md for commit style and push policy; the rules there are authoritative. If CLAUDE.md points to a skill or other reference for these rules, follow the pointer and invoke it; the referenced content is the rule. Repo history is reference only for style details the rules leave silent. Git history is immutable, so a single off-style commit must not seed every commit that follows: before drafting each commit subject, name the rule you are applying and its source. Do not rebase, fast-forward, or otherwise reshape the branch during the mission; it exists to absorb every commit so the operator can drop the whole branch and start over if the mission is not it.
+The mission branch was created at setup; stay on it. Read the active project and user instruction files for commit style and push policy; the rules there are authoritative. If those instructions point to a skill or other reference for these rules, follow the pointer and invoke it; the referenced content is the rule. Repo history is reference only for style details the rules leave silent. Git history is immutable, so a single off-style commit must not seed every commit that follows: before drafting each commit subject, name the rule you are applying and its source. Do not rebase, fast-forward, or otherwise reshape the branch during the mission; it exists to absorb every commit so the operator can drop the whole branch and start over if the mission is not it.
 
 Quality over speed. No duct tape, no hacks. Structural solutions. Commit per logical step. Do not transition out of DRIVE with uncommitted changes.
 
@@ -422,9 +484,9 @@ Six passes. Each one can send the rover back to DRIVE with a specific target. IN
 
 2. **Pride pass (hard gate).** This is the first of two pride obligations the rover carries; the other is per-artefact pride (see the "Pride is a hard gate" section above), which runs again at every handoff moment, including `stop`'s drafted communiqué. The INSPECT pride pass covers the batch of work produced since the previous pride log entry. Invoke `pride` on that batch. A contrarian subagent looks for what the user would hate: duplicate fixes, type smells, ugly helpers, defensive filtering, race conditions, confidence laundering, over-claims, ungrounded references, missing sources, and the effort-and-scope reflex pattern (`pride` category 9 for code, 8 for prose). Findings get the three-fates treatment from the "Three fates" section above (fix, cost-value-skip with structured rationale, or reject-as-non-issue with pride's second-pass evidence). A reject (fate 3) forces a second pride run with a different subagent and is final only once that second contrarian pass independently confirms it as hollow; a fate-2 cost-value-skip requires the structured rationale (concrete output cost, concrete value, named canon-vraag) but no second pride run. The outcome is logged under a `[HH:MM] Pride check findings:` block in the Log. INSPECT cannot transition to STOW without that block for the current batch of work. No exemption for "there is no diff": if the rover produced a research brief, a plan, a letter, a video script, or any other artefact, pride runs on that artefact. Pride findings are first compared against the SURVEY-end Foresight: matches tagged `noise` skip the second-pass machinery (pre-decided), matches against `core` or `collateral` are sanity checks against the Plan (if the work landed, log the match and move on; if not, the Plan or DRIVE failed to land what was predicted, fix it now), and findings NOT in the Foresight are blind-spot findings that route through the three-fates mechanic unchanged.
 
-3. **End-user pass.** Spawn a Sonnet subagent (Agent tool with `model: "sonnet"`) with only the stated goal and the application domain. Not the code, not the plan. The agent uses the feature as a user and reports confusion, missing feedback, edge cases, dead ends. Default to fixing, not deferring.
+3. **End-user pass.** Use the host's delegated-agent mechanism when available, preferably a fresh reviewer with no prior context, and give it only the stated goal and the application domain. Not the code, not the plan. The reviewer uses the feature as a user and reports confusion, missing feedback, edge cases, dead ends. If no delegated-agent mechanism exists, run the same no-prior-context review as a separate pass in the active session and log that fallback. Default to fixing, not deferring.
 
-4. **Technical pass.** Spawn a Sonnet subagent (Agent tool with `model: "sonnet"`) that reviews the diff against the plan. Does it match the goal? Odd jumps? Unnecessary complexity? Missed alternatives? Before the technical review, if the project has tech-specific skills matching the changed file types, load them. The subagent returns its findings; the loop reads them on the session model and decides whether they send the rover back to DRIVE.
+4. **Technical pass.** Use the host's delegated-agent mechanism when available, preferably a fresh reviewer with no prior context, to review the diff against the plan. Does it match the goal? Odd jumps? Unnecessary complexity? Missed alternatives? Before the technical review, if the project has tech-specific skills matching the changed file types, load them. The reviewer returns its findings; the loop reads them on the session model and decides whether they send the rover back to DRIVE. If no delegated-agent mechanism exists, run the same review as a separate pass in the active session and log that fallback.
 
 5. **Gurus pass (hard gate).** Invoke `gurus:gurus` via the Skill tool with mission context in `args`: the Dispatch summary, the branch name, and a pointer to the diff or decision artefact. The orchestrator routes between `gurus:software`, `gurus:council`, or any future panel and returns a verdict. The rover never names a sub-panel directly; routing is the orchestrator's job. Log the outcome under a `[HH:MM] Gurus review findings:` block. Findings get the three-fates treatment from the "Three fates" section above (fix, cost-value-skip with structured rationale, or reject-as-non-issue with pride's second-pass evidence). INSPECT cannot transition to STOW without this block on record. See the "Gurus is a hard gate" section above for the contract. Gurus findings follow the same Foresight comparison as pride findings.
 
@@ -454,30 +516,30 @@ If STOW uncovers something that requires a logic change (for example, a "prematu
 
 When the diff is clean and the cleanup commit has landed, transition to STANDBY.
 
-PR creation is not a rover default. The rover commits the work locally on the mission branch. A Draft PR is only created when either the Dispatch explicitly asks for one, or the project's documented convention (read `CLAUDE.md`) treats every mission as PR-bound. When neither holds, the rover stops at local commits and any remote-side workflow is the operator's. If `reviewbot` is configured AND a PR was created, invoke it after the PR is up.
+PR creation is not a rover default. The rover commits the work locally on the mission branch. A Draft PR is only created when either the Dispatch explicitly asks for one, or the project's documented convention in its active instruction files treats every mission as PR-bound. When neither holds, the rover stops at local commits and any remote-side workflow is the operator's. If `reviewbot` is configured AND a PR was created, invoke it after the PR is up.
 
 **STANDBY**
 
-The mission is complete but the rover stays in orbit. STANDBY keeps the cron alive so the rover can absorb new input, catch crashed bash sessions during active work, and transition back to SURVEY when the operator sends a follow-up.
+The mission is complete but the rover may stay reachable while there are live listeners. STANDBY lets the rover absorb new input, catch interrupted active work, and transition back to SURVEY when a watched signal changes.
 
-**Persistent mode has no STANDBY cron.** When `cron_job_id` is `none (persistent process)`, the process drove the phase machine to completion in one pass and there is no heartbeat. STANDBY has no idle-backoff role here: run the entry check once and end the mission through `stop`. The cron-management steps below stay as written; `autonomous:cron` no-ops on the sentinel (see its "No cron, no-op" section), so they do nothing without any special-casing here.
+**Some hosts have no STANDBY continuation.** When `continuation` is `in-process` or `none (drive current turn)`, there may be no heartbeat after the current turn yields. STANDBY still runs the entry check once. If there are no live listeners, end the mission through `stop`. If listeners remain but no continuation exists, log that the loop is waiting for an explicit `/rover:rover <loop-file>` wake or an external host signal.
 
-The cron's safety-net role is scoped to transient failures during active phases: a failed bash command, a timed-out tool call, or an interrupted edit that leaves the session stuck mid-turn. The cron fires on REPL-idle and re-reads the loop file, which restarts the phase machine from its last logged state. That safety net is not meant as an eternal watch post: sustained idleness means the mission is truly done, and the cron has a hard cap to stop token burn.
+The continuation safety-net is scoped to transient failures during active phases: a failed shell command, a timed-out tool call, or an interrupted edit that leaves the session stuck mid-turn. A host-owned continuation re-enters the loop file and restarts the phase machine from its last logged state. That safety net is not meant as an eternal watch post: sustained idleness means the mission is truly done, and the host should back off or stop to avoid token burn.
 
-**Entry check: any listeners?** The first thing STANDBY does on entry is decide whether to stay. Listeners are concrete signals that can change what the rover cares about: an open PR with reviews or CI the rover is watching, CI jobs still running, or uncommitted work in the tree. Zero listeners means nothing to wait for: invoke `stop` via the Skill tool to cut the cron, log the final entry, and transmit the communiqué. Keep STANDBY-with-cron only when at least one listener is live; otherwise the backoff loop is watching nothing. New input later relights the loop via `/rover:rover` either way.
+**Entry check: any listeners?** The first thing STANDBY does on entry is decide whether to stay. Listeners are concrete signals that can change what the rover cares about: an open PR with reviews or CI the rover is watching, CI jobs still running, or uncommitted work in the tree. Zero listeners means nothing to wait for: invoke `stop` via the Skill tool to mark or cancel the continuation, log the final entry, and transmit the communiqué. Keep STANDBY only when at least one listener is live; otherwise the backoff loop is watching nothing. New input later wakes the loop via `/rover:rover` either way.
 
-**Ending a mission goes through `stop`. Always.** A mission ends in exactly one way: invoke `stop` via the Skill tool. `stop` cuts the cron, sets `cron_job_id: stopped`, writes the final timestamped log entry, drafts the communiqué, runs pride on it, and transmits it. The rover does NOT shortcut this by manually editing `cron_job_id` to `stopped`, manually flipping the Phase to STOW, manually ticking Done criteria in-place, or hand-writing a recap into the chat instead of letting `stop` produce one. Those edits are what `stop` does; performing the first three steps yourself and skipping the rest is a half-stop. The mission feels closed, but the structured mission-report the operator expects to read on return is missing, the pride pass on the communiqué is missing, and the optional notify_on_done is missing. If the rover catches itself manually killing a cron with `CronDelete`, manually writing `cron_job_id: stopped` into the loop file, or marking the Done section closed without `stop` having run, revert the manual edits if needed, invoke `stop`, let it do all the steps in order. The only legitimate manual `CronDelete` is the one inside `stop` itself.
+**Ending a mission goes through `stop`. Always.** A mission ends in exactly one way: invoke `stop` via the Skill tool. `stop` marks or cancels the host continuation, writes the final timestamped log entry, drafts the communiqué, runs pride on it, and transmits it. The rover does NOT shortcut this by manually editing `continuation` to `stopped`, manually flipping the Phase to STOW, manually ticking Done criteria in-place, or hand-writing a recap into the chat instead of letting `stop` produce one. Those edits are what `stop` does; performing the first steps yourself and skipping the rest is a half-stop. The mission feels closed, but the structured mission-report the operator expects to read on return is missing, the pride pass on the communiqué is missing, and the optional notify_on_done is missing. If the rover catches itself manually cancelling a continuation, manually writing `continuation: stopped` into the loop file, or marking the Done section closed without `stop` having run, revert the manual edits if needed, invoke `stop`, let it do all the steps in order.
 
 When a PR exists, minimum checks per iteration:
 - `git status --short` (uncommitted work from the session)
 - PR comments and reviews (via `gh api`)
 - CI status (via `gh pr checks`)
 
-**Token economy.** Delegate the polling itself to a Sonnet subagent (Agent tool with `model: "sonnet"`). Brief it to run the three commands and return the raw output, nothing interpreted. Comparing yesterday's snapshot against today's, deciding what is new, judging whether a finding warrants a transition to SURVEY: that reasoning happens in the main loop on the session model. The subagent is a hand, not a head.
+**Token economy.** When the host exposes a delegated-agent mechanism, delegate the polling itself to a cheap independent worker. Brief it to run the three commands and return the raw output, nothing interpreted. Comparing yesterday's snapshot against today's, deciding what is new, judging whether a finding warrants a transition to SURVEY: that reasoning happens in the main loop on the session model. The delegated worker is a hand, not a head. If the host has no delegated agents, run the polling directly.
 
 New findings from STANDBY go back to SURVEY (not DRIVE, and not queued for the operator). New input is new information: understand it before acting on it. Iteratively downgrading to a fix-first approach has a track record of missing the real cause.
 
-When no new activity, increment `watch_checks` and invoke `autonomous:cron` for backoff (a no-op in persistent mode). The schedule and the hard cap live in `cron`; do not restate the numbers here. When the cap fires: CronDelete, log `STANDBY: auto-stopped after 10 idle checks. /rover:rover <loop-file> to relight.`, and invoke `notify_on_done` if configured. The loop file stays; only the cron dies. Past this point the safety net is gone: a fresh interjection or `/rover:rover <loop-file>` relights the cron (Interjections section below covers the interjection path).
+When no new activity, increment `watch_checks` and ask the host continuation mechanism to back off if it supports scheduling. The exact cadence belongs to the host, not to rover. When the host cap fires, or when `watch_checks` reaches 10 without new activity, invoke `stop` with trigger `watch_checks cap`, log `STANDBY: auto-stopped after 10 idle checks. /rover:rover <loop-file> to wake.`, and invoke `notify_on_done` if configured. The loop file stays; only the continuation is stopped or marked stopped. Past this point the safety net is gone: a fresh interjection or `/rover:rover <loop-file>` arranges a new continuation if the host has one (Interjections section below covers the interjection path).
 
 ### Decisions
 
@@ -492,7 +554,7 @@ Any input that arrives mid-loop, regardless of channel, is a broadcast, not the 
 On any interjection:
 
 1. Log the input verbatim to `## Log` with a timestamp. Do not paraphrase; the operator may come back later and compare to what they sent.
-2. **If the cron is stopped (auto-stop or manual), relight it.** Invoke `autonomous:cron` to `CronCreate` at `* * * * *`, reset `watch_checks: 0`, update `cron_job_id` in the loop file. New input is proof the operator is present; idle-backoff resets. In persistent mode `autonomous:cron` no-ops, so this reschedule safely does nothing; just integrate the input and keep driving.
+2. **If continuation is stopped (auto-stop or manual), arrange a fresh one through the host if available.** Reset `watch_checks: 0`, update `continuation` and `continuation_handle` in the loop file, and keep driving. New input is proof the operator is present; idle-backoff resets. If no host continuation exists, record `continuation: none (drive current turn)` and continue in the active turn.
 3. Evaluate whether it changes the plan. If yes, transition to SURVEY and re-plan. If no, note why not in the Log and stay on the current phase.
 4. If the input surfaces a choice, invoke `decide`. Never hold the choice open waiting for the operator's next message.
 5. Resume the loop. Do not emit "I will wait for your next message" or any equivalent stall.
@@ -516,18 +578,18 @@ Every log line needs a timestamp from `date +%H:%M`. Never guess based on "it wa
 
 ## Delegation
 
-"Delegate" throughout these skills means: call the Skill tool with the target skill name. Not inline instructions, not shelling out. The Skill tool invocation. The autonomy layer is reached this way.
+"Delegate" throughout these skills means: invoke the target skill through the active agent's skill mechanism. Not inline instructions, not shelling out. Runtime-specific continuation helpers are reached only through the host continuation contract, not as rover skill dependencies.
 
 ## The first iteration
 
-Cron fires on REPL idle. You are not idle, you just finished setup. Run the SURVEY iteration yourself, in the same turn:
+Host continuations usually run after the active turn yields. You are not idle, you just finished setup. Run the SURVEY iteration yourself, in the same turn:
 
 1. Read the loop file you just wrote
 2. Execute the SURVEY instructions
 3. Log each meaningful action with a timestamp from `date +%H:%M`
 4. When SURVEY completes, transition to DRIVE and start
 
-The cron is the safety net for everything after you stop driving, not the starter.
+The host continuation is the safety net for everything after you stop driving, not the starter.
 
 ## Branch strategy
 
@@ -549,7 +611,7 @@ The contract is "any skill the operator has installed and named in their invocat
 
 ## Project conventions
 
-The loop reads both user CLAUDE.md and project CLAUDE.md before any code change. It adapts to:
+The loop reads the active user-level and project-level instruction files before any code change (`CLAUDE.md`, `AGENTS.md`, or the host's equivalent). It adapts to:
 
 - Commit style
 - Push approval policy
@@ -579,4 +641,4 @@ These are project-specific and not hardcoded in this skill.
 
 ## Waking or stopping
 
-A running loop is woken with `/rover:rover <file>` and stopped with `/rover:stop <file>`. The loop itself does not handle these; they are separate skills. See `autonomous:wake` and `stop`.
+A running loop is woken with `/rover:rover <file>` and stopped with `/rover:stop <file>`. The loop itself does not own host wake machinery; the entrypoint reads the loop file, arranges continuation if available, and hands control back to the phase machine. See `stop` for shutdown.

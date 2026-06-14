@@ -5,6 +5,15 @@ once per machine whenever the installed `version` in
 `.claude-plugin/plugin.json` changes. Header version numbers are informational;
 the broadcast is positional.
 
+## [v2.0.9]
+
+### Fixed
+
+- **`rover` is multi-agent again.** It no longer depends directly on
+  `autonomous:keepalive`; the active host or caller owns the continuation
+  mechanism. Claude Code can still use `autonomous` as one keepalive
+  implementation, while Codex receives the rover skills again.
+
 ## [v2.0.1]
 
 ### Breaking

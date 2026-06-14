@@ -31,7 +31,7 @@ The pride check injects an independent skeptic before the loop transitions to it
 
 (If a loop runs INSPECT, fixes things, then ships more work, run pride once per batch. Every new batch of artefact before handoff gets its own pride pass.)
 
-**There is no exemption for research-only missions.** A loop whose output is a research brief, a plan, an analysis document, or any other prose deliverable gets the same pride pass as a loop that ships code. The artefact IS the diff-equivalent. See "Gathering the artefact" below for how to feed a prose-only deliverable to the contrarian subagent.
+**There is no exemption for research-only missions.** A loop whose output is a research brief, a plan, an analysis document, or any other prose deliverable gets the same pride pass as a loop that ships code. The artefact IS the diff-equivalent. See "Gathering the artefact" below for how to feed a prose-only deliverable to the contrarian reviewer.
 
 **Manually via `/rover:pride`:**
 - `/rover:pride` reviews the uncommitted changes plus commits on the current branch not yet on the default branch
@@ -40,9 +40,9 @@ The pride check injects an independent skeptic before the loop transitions to it
 
 ## How
 
-Spawn a Sonnet subagent (Agent tool with `model: "sonnet"`) with no prior context. Give it the artefact, the loop's Context section if one exists, and the matching brief below.
+Use the host's delegated-agent mechanism when available, preferably a fresh reviewer with no prior context. Claude can use its Agent tool; other hosts may expose a different delegated-agent or work-loop mechanism. If the host exposes no delegated agent, run the same review as a separate no-prior-context pass in the active session and log that fallback. Give the reviewer the artefact, the loop's Context section if one exists, and the matching brief below.
 
-For code artefacts, give the subagent the diff plus this brief:
+For code artefacts, give the reviewer the diff plus this brief:
 
 > You are reviewing recent code changes with a skeptical eye. You have not seen the implementation decisions, the plan, or the reasoning. Ignore sunk cost.
 >
@@ -62,7 +62,7 @@ For code artefacts, give the subagent the diff plus this brief:
 >
 > Be blunt. A finding is better than a compliment. If there is nothing to find, say so explicitly, but try hard first.
 
-For prose artefacts (research briefs, plans, analysis documents, letters, summaries, PR descriptions, communiqués), give the subagent the artefact plus this brief:
+For prose artefacts (research briefs, plans, analysis documents, letters, summaries, PR descriptions, communiqués), give the reviewer the artefact plus this brief:
 
 > You are reviewing a written deliverable with a skeptical eye. You have not seen the mission, the sources, or the reasoning. Ignore sunk cost. The author cannot defend themselves; your job is to find what the operator would push back on.
 >
@@ -86,9 +86,9 @@ For prose artefacts (research briefs, plans, analysis documents, letters, summar
 Pride runs on whatever the rover produced. Start by naming the artefact:
 
 1. **Code artefact.** A diff exists. Use the git range logic below to collect it.
-2. **Prose artefact with no committed diff.** A research brief, plan, analysis, letter, or summary that lives as a file in the repo, in `.autonomous/<NAME>.md`, or as a drafted response in the loop file. Feed the full text of that file or section to the subagent as the review target.
-3. **Mixed.** The rover produced both code and prose. Run pride twice with the appropriate brief for each, or give the subagent both payloads with a clear separator and both briefs.
-4. **Generated media (images, audio, video, slides).** Describe the artefact in words (filename, purpose, summary of contents, any claims embedded in captions or voice-over), feed that description to the subagent with the prose brief, and run pride on the source text of any embedded claims.
+2. **Prose artefact with no committed diff.** A research brief, plan, analysis, letter, or summary that lives as a file in the repo, in `.autonomous/<NAME>.md`, or as a drafted response in the loop file. Feed the full text of that file or section to the reviewer as the review target.
+3. **Mixed.** The rover produced both code and prose. Run pride twice with the appropriate brief for each, or give the reviewer both payloads with a clear separator and both briefs.
+4. **Generated media (images, audio, video, slides).** Describe the artefact in words (filename, purpose, summary of contents, any claims embedded in captions or voice-over), feed that description to the reviewer with the prose brief, and run pride on the source text of any embedded claims.
 
 If the rover cannot identify an artefact to hand to pride, there is nothing to hand off either. The pride gate is not satisfied by absence of output; it is only satisfied by a reviewed artefact.
 
@@ -135,7 +135,7 @@ fi
 
 `*...*` matches the symmetric-difference form (`main...HEAD`) which git treats differently from `main..HEAD`. Passing it through to git is correct.
 
-Pass the collected diff to the subagent. Large diffs: `git diff --stat "$RANGE"` first, pick hot files, truncate per-file reads to 300 lines with a note, rather than dumping a 5000-line blob.
+Pass the collected diff to the reviewer. Large diffs: `git diff --stat "$RANGE"` first, pick hot files, truncate per-file reads to 300 lines with a note, rather than dumping a 5000-line blob.
 
 ## What to do with findings
 
@@ -158,7 +158,7 @@ Pride is not a deferral mechanism. Its output is a list of things to weigh, not 
 
 Fate 3 (reject-as-non-issue) is the suspect move. The rover built the work, so it has every incentive to wave a finding away; a second reader who did not build it is the most reliable correction available. A threshold-based gate ("run pass 2 only when rejects exceed N%") quietly contradicts this principle by admitting a band where rejects pass unreviewed. Any ratio above zero is arbitrary and defensible only by feel, and feel about rejects has no reason to be well-calibrated: the author's incentive to keep a reject standing is exactly the incentive the second pass exists to counter.
 
-So the rule is flat: **any fate-3 reject triggers a second pride pass** before it is final. Run pride a second time with a different subagent and a stricter brief ("the author rejected the following findings as non-issues; tell me which rejects are hollow and which ones are real"), reconcile the two reports, log both runs in the loop file. A fate-3 reject is only final after the second-run subagent independently agrees (concrete-evidence-of-non-issue, per `rover`'s fate-3 definition). If the second pass says the finding is real, the rover fixes it (fate 1) or, if cost outweighs value, applies fate 2 with a structured rationale.
+So the rule is flat: **any fate-3 reject triggers a second pride pass** before it is final. Run pride a second time with a different reviewer when the host can provide one, or a separate stricter pass in the active session when it cannot ("the author rejected the following findings as non-issues; tell me which rejects are hollow and which ones are real"), reconcile the two reports, log both runs in the loop file. A fate-3 reject is only final after the second-run reviewer independently agrees (concrete-evidence-of-non-issue, per `rover`'s fate-3 definition). If the second pass says the finding is real, the rover fixes it (fate 1) or, if cost outweighs value, applies fate 2 with a structured rationale.
 
 **Fate 2 (cost-value-skip) does not trigger a second pride pass.** The structured rationale itself is the evidence: concrete output cost, concrete value, named canon-vraag from `rover`. "Bewuste keuze" without that structure is not a fate-2 rationale, it is a feeling, and feelings do not retire findings. "Out of scope" is never a fate-2 rationale inside an autonomous rover: scope is the Dispatch's job, not the rover's; the rover weighs output cost against value, not scope-fit. Neither is "pre-existing" or "not introduced by this mission" a fate-2 rationale: authorship and timing are not output-cost arguments, see `rover`'s "Origin is not a scope argument".
 
@@ -182,14 +182,14 @@ These phrases are NOT banned inside the mission-internal fate-2 cost-value ratio
 
 ## What counts as "nothing found"
 
-Genuinely clean work exists. But "I checked and it looks fine" is not a review. If the subagent returns "nothing found," require it to list:
+Genuinely clean work exists. But "I checked and it looks fine" is not a review. If the reviewer returns "nothing found," require it to list:
 
 - What it examined (files, patterns, specific risk areas)
 - Why nothing was flagged (specific, not generic)
 
 One sentence minimum per risk category. "No race conditions because the new code runs inside a single database transaction" beats "no race conditions found."
 
-If the subagent returns a vague "looks good," reject and re-run with stronger prompting.
+If the reviewer returns a vague "looks good," reject and re-run with stronger prompting.
 
 ## Anti-patterns
 
@@ -207,4 +207,4 @@ If the subagent returns a vague "looks good," reject and re-run with stronger pr
 
 ## Token awareness
 
-This skill spawns a subagent with a diff payload. For large branches, prefer `git diff --stat` first and then targeted diff reads. Do not dump a 5000-line diff into the subagent; summarize and focus.
+This skill sends a diff payload to an independent reviewer when the host can provide one, or runs a separate review pass in the active session when it cannot. For large branches, prefer `git diff --stat` first and then targeted diff reads. Do not dump a 5000-line diff into the reviewer; summarize and focus.

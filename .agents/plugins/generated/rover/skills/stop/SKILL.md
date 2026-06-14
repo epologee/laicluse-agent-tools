@@ -1,9 +1,7 @@
 ---
 name: stop
 description: >-
-  End a rover mission on purpose. Cuts the cron, writes a final log entry, and transmits a mission report home: a length-scaled narrative of the traverse, a qualitative conclusion, a (usually empty) not-done listing, and any external-action gates the rover could not take itself (push, merge, deploy). Reached via the rover entry point.
-user-invocable: false
-effort: low
+  End a rover mission on purpose. Stops or marks the host continuation, writes a final log entry, and transmits a mission report home: a length-scaled narrative of the traverse, a qualitative conclusion, a (usually empty) not-done listing, and any external-action gates the rover could not take itself (push, merge, deploy). Reached via the rover entry point.
 ---
 
 # Autonomy Stop
@@ -19,11 +17,11 @@ End a loop on purpose, with a recap.
 ## What it does
 
 1. Locate the loop file. If an argument is given, use it. If not, list `.autonomous/*.md` candidates in the conversation and ask which to stop. The ask is only correct when stop was operator-invoked (see step 4 on attribution); when stop was rover-invoked the args carry the loop-file path already.
-2. Read `cron_job_id` from the file. If it names a live cron job, invoke `autonomous:cron` via the Skill tool to `CronDelete` that id. When the value is `none (persistent process)`, `paused`, `stopped`, or `failed`, there is no live cron to cut; skip the CronDelete and proceed.
-3. Set `cron_job_id: stopped` in the loop file.
+2. Read `continuation` and `continuation_handle` from the file. If the active host exposes a way to cancel that continuation, use it. If the host does not expose cancellation, or the loop file only has legacy cron metadata, do not call runtime-specific helpers directly from rover; mark the loop file as stopped and proceed. Legacy loop files may still contain `cron_job_id`; preserve it as history unless the active host owns and can cancel that exact handle through its own continuation mechanism.
+3. Set `continuation: stopped` in the loop file. If a legacy `cron_job_id` field exists, set `legacy_cron_job_id: stopped` or `cron_job_id: stopped` consistently with the file's existing field name.
 4. Append a final log entry with a timestamp from `date +%H:%M`. Attribute the stop correctly based on caller:
    - When the operator typed `/rover:stop` (the slash command, with or without a file path argument): `[HH:MM] Stopped by operator. Phase at stop: <PHASE>.`
-   - When another skill invoked `stop` via the Skill tool from inside the loop (the rover's STANDBY entry-check finding zero listeners, an INSPECT pass concluding mission-complete, or any other autonomous trigger that calls into this skill): `[HH:MM] Stopped autonomously (<trigger>). Phase at stop: <PHASE>.` where `<trigger>` names the autonomous reason concretely ("zero listeners after STANDBY entry-check", "INSPECT-complete handoff", "watch_checks cap" from the cron skill's auto-stop path, and so on).
+   - When another skill invoked `stop` via the Skill tool from inside the loop (the rover's STANDBY entry-check finding zero listeners, an INSPECT pass concluding mission-complete, or any other autonomous trigger that calls into this skill): `[HH:MM] Stopped autonomously (<trigger>). Phase at stop: <PHASE>.` where `<trigger>` names the autonomous reason concretely ("zero listeners after STANDBY entry-check", "INSPECT-complete handoff", "watch_checks cap" from the host continuation path, and so on).
    - The default attribution is "operator" only when the caller is genuinely the operator. The slash-command invocation is the operator; an autonomous loop calling this skill from inside its own phase machine is the rover. Misattributing a rover-invoked stop as "by user" makes the log read as if the operator pulled the plug when the rover actually closed itself out, which the operator will spot and ask about (this distinction matters; do not collapse it).
 5. Produce a communiqué to the conversation. The communiqué is itself a rover artefact, so run `pride` on the drafted text before transmitting it (log the pride findings in the loop file, fix them or reject them with concrete evidence of non-issue via the second-pass gate, then send the final version).
 
@@ -79,4 +77,4 @@ End a loop on purpose, with a recap.
 
 ## After stop
 
-The cron is gone. The loop file stays. Any future `/rover:rover <file>` will bring it back with a fresh cron.
+The continuation is stopped or marked stopped. The loop file stays. Any future `/rover:rover <file>` will bring it back with a fresh host continuation when one is available.

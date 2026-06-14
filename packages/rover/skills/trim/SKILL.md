@@ -1,6 +1,6 @@
 ---
 name: trim
-description: Subtraction-pass before STOW. Spawns a Sonnet subagent that walks the mission diff and asks "what did we write that does not earn its weight?" (the inverse of pride). Hard gate in INSPECT.
+description: Subtraction-pass before STOW. Uses an independent reviewer to walk the mission diff and ask "what did we write that does not earn its weight?" (the inverse of pride). Hard gate in INSPECT.
 user-invocable: true
 argument-hint: "[git-range | uncommitted]"
 effort: max
@@ -20,7 +20,7 @@ Code costs are paid forever. A line shipped has to be read by every future maint
 
 The rover, left to its own devices, ships what every pass asked for. That works on missions where the dispatch was complex enough to absorb the additions. It fails on missions where the dispatch was small and the INSPECT passes generated proposals at their normal rate; the diff then carries far more weight than the operator wanted to move.
 
-Trim closes this gap by asking, at the end of INSPECT, the one question no other pass asks. The findings are weighed with the same three-fates rubric `rover` defines: fix (remove), cost-value-skip with structured rationale (keep with reason), or reject-as-non-issue (the trim subagent was wrong about this chunk, confirmed by a pride second pass).
+Trim closes this gap by asking, at the end of INSPECT, the one question no other pass asks. The findings are weighed with the same three-fates rubric `rover` defines: fix (remove), cost-value-skip with structured rationale (keep with reason), or reject-as-non-issue (the trim reviewer was wrong about this chunk, confirmed by a pride second pass).
 
 ## When to run
 
@@ -37,9 +37,9 @@ Useful outside a rover session whenever a diff feels heavier than the change req
 
 ## How
 
-Spawn a Sonnet subagent (Agent tool with `model: "sonnet"`) with no prior context. Give it the artefact, the Dispatch text (so it knows what was actually asked for), and the brief below.
+Use the host's delegated-agent mechanism when available, preferably a fresh reviewer with no prior context. Claude can use its Agent tool; other hosts may expose a different delegated-agent or work-loop mechanism. If the host exposes no delegated agent, run the same review as a separate no-prior-context pass in the active session and log that fallback. Give the reviewer the artefact, the Dispatch text (so it knows what was actually asked for), and the brief below.
 
-For code artefacts, give the subagent the diff plus this brief:
+For code artefacts, give the reviewer the diff plus this brief:
 
 > You are reviewing recent code changes for what should not be there. Not bugs, not smells; the inverse. Your job is to find lines, helpers, abstractions, comments, configurations, or files that were added during the mission but do not earn their weight relative to what the Dispatch asked for.
 >
@@ -55,7 +55,7 @@ For code artefacts, give the subagent the diff plus this brief:
 >
 > Be willing to find nothing. A tight diff is real. But if you find nothing, list what you examined and why each section earned its weight, in one sentence per section. Vague "looks tight" is rejected.
 
-For prose artefacts (research briefs, plans, analysis documents, letters, summaries, PR descriptions, communiqués, prompts, SKILL.md edits), give the subagent the artefact plus this brief:
+For prose artefacts (research briefs, plans, analysis documents, letters, summaries, PR descriptions, communiqués, prompts, SKILL.md edits), give the reviewer the artefact plus this brief:
 
 > You are reviewing a written deliverable for what should not be there. Not unclarity, not unsupported claims; the inverse. Your job is to find sentences, paragraphs, sections, lists, or headings that were added during the mission but do not earn their weight relative to what the Dispatch asked for.
 >
@@ -76,9 +76,9 @@ For prose artefacts (research briefs, plans, analysis documents, letters, summar
 Trim runs on whatever the rover produced this mission. Start by collecting two payloads:
 
 1. **The diff or artefact.** Same logic as `pride` (see "Gathering the diff" in `pride`). For prose-only missions, feed the full text of the artefact files or sections. For mixed missions, run trim twice with the appropriate brief for each, or combine both payloads with the matching briefs.
-2. **The Dispatch text.** When the rover invokes trim, the Dispatch lives in the loop file's `## Dispatch` section. Feed it verbatim to the subagent so it knows what was actually asked. For manual invocation, ask the user for the original task description, or accept that the subagent will work without it (in which case it leans harder on the carry-its-weight and over-explanation tests, and lighter on mission-relevance).
+2. **The Dispatch text.** When the rover invokes trim, the Dispatch lives in the loop file's `## Dispatch` section. Feed it verbatim to the reviewer so it knows what was actually asked. For manual invocation, ask the user for the original task description, or accept that the reviewer will work without it (in which case it leans harder on the carry-its-weight and over-explanation tests, and lighter on mission-relevance).
 
-The subagent compares the diff against the Dispatch; that comparison is the core of the cumulative-weight test.
+The reviewer compares the diff against the Dispatch; that comparison is the core of the cumulative-weight test.
 
 ## Bias toward subtraction
 
@@ -133,4 +133,4 @@ If trim uncovers something that requires more than removal (a refactor, a behavi
 
 ## Token awareness
 
-This skill spawns a subagent with a diff payload plus the Dispatch text. For large branches, prefer `git diff --stat` first and then targeted diff reads. Do not dump a 5000-line diff into the subagent; summarise and focus. The Dispatch text is always small; include it verbatim.
+This skill sends a diff payload plus the Dispatch text to an independent reviewer when the host can provide one, or runs a separate review pass in the active session when it cannot. For large branches, prefer `git diff --stat` first and then targeted diff reads. Do not dump a 5000-line diff into the reviewer; summarise and focus. The Dispatch text is always small; include it verbatim.

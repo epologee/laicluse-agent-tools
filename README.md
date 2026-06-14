@@ -23,9 +23,9 @@ The marketplace currently ships:
   backoff, wake) is needed; persistent processes run without it.
 - `gurus`: opinionated review panels for code, decisions, and prose. The
   orchestrator routes to the software, council, or writers panel.
-- `rover` (Claude Code): dispatch a rover at a task and stay back while it
-  decides in the field: a phase machine with decide, pride/trim quality gates,
-  verify evidence discipline, and a stop communique.
+- `rover`: dispatch a rover at a task and stay back while it decides in the
+  field: a phase machine with decide, pride/trim quality gates, verify
+  evidence discipline, and a stop communique.
 - `clipboard`: copy the core content of the last answer to the macOS
   clipboard. Plain text by default, `/clipboard slack` for rich text.
 - `laicluse-agent-tools` (Claude Code): marketplace-wide utilities.
@@ -64,6 +64,7 @@ codex plugin add dont-do-that@laicluse-agent-tools
 codex plugin add intervision@laicluse-agent-tools
 codex plugin add anger-management@laicluse-agent-tools
 codex plugin add gurus@laicluse-agent-tools
+codex plugin add rover@laicluse-agent-tools
 codex plugin add clipboard@laicluse-agent-tools
 ```
 

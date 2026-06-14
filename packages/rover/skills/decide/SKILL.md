@@ -80,27 +80,41 @@ Use once per loop at most. When a genuinely structural choice is in front of you
 **Fallback: `/brainstorming`** if present.
 When the decision is creative rather than technical (naming, framing, scope), brainstorming works better than the research skills above.
 
-**Detection.** Before invoking any of these, check they exist. Use `installed_plugins.json` as the source of truth; cache directories can hold stale versions of plugins that are no longer installed.
+**Detection.** Before invoking any of these, check they exist through the active host's installed-skill source of truth; cache directories can hold stale versions of plugins that are no longer installed.
 
 ```bash
 has_skill() {
   local name="$1"
-  local inst="$HOME/.claude/plugins/installed_plugins.json"
-  # Installed plugin whose bare name matches (keys look like "name@marketplace").
-  if [ -r "$inst" ] && jq -e --arg n "$name" \
+  local inst ip
+
+  # Claude Code installed plugin whose bare name matches (keys look like "name@marketplace").
+  inst="$HOME/.claude/plugins/installed_plugins.json"
+  if [ -r "$inst" ] && command -v jq >/dev/null 2>&1 && jq -e --arg n "$name" \
        '.plugins | keys[] | select(startswith($n + "@"))' \
        "$inst" >/dev/null 2>&1; then
     return 0
   fi
-  # Skill directory inside any currently-installed plugin.
-  if [ -r "$inst" ]; then
-    local ip
+  # Skill directory inside any currently-installed Claude plugin.
+  if [ -r "$inst" ] && command -v jq >/dev/null 2>&1; then
     while IFS= read -r ip; do
       [ -n "$ip" ] && [ -d "$ip/skills/$name" ] && return 0
     done < <(jq -r '.plugins[][] | .installPath // empty' "$inst" 2>/dev/null)
   fi
+
+  # Codex installed plugin whose bare name matches, or whose source carries the skill.
+  if command -v codex >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    if codex plugin list --json 2>/dev/null | jq -e --arg n "$name" \
+         '.installed[]? | select((.pluginId // "") | startswith($n + "@"))' \
+         >/dev/null 2>&1; then
+      return 0
+    fi
+    while IFS= read -r ip; do
+      [ -n "$ip" ] && [ -d "$ip/skills/$name" ] && return 0
+    done < <(codex plugin list --json 2>/dev/null | jq -r '.installed[]?.source.path // empty' 2>/dev/null)
+  fi
+
   # User-level skills live outside the plugin cache.
-  [ -e "$HOME/.claude/skills/$name" ]
+  [ -e "$HOME/.claude/skills/$name" ] || [ -e "$HOME/.codex/skills/$name" ]
 }
 ```
 
@@ -119,7 +133,7 @@ Every decision you make inside a loop adds a row to the loop file's `## Decision
 ```markdown
 | # | Phase | Decision | Classification | Principle | Rationale |
 |---|-------|----------|----------------|-----------|-----------|
-| 12 | DRIVE | Separate `cron` skill from `rover` | Taste | Explicit > Clever | Audit flagged cron/decay as the messiest section. Splitting makes each piece readable in 30 seconds. |
+| 12 | DRIVE | Separate host continuation from `rover` | Taste | Explicit > Clever | Audit flagged keepalive mechanics as the messiest section. Splitting makes each piece readable in 30 seconds. |
 ```
 
 The trail lives on disk, not in conversation context. Future iterations can read it to understand why earlier choices were made.

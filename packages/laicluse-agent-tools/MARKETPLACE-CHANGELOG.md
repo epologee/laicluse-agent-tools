@@ -11,11 +11,12 @@ span multiple plugins.
 ## [2026-06] Codex catalog omits Claude-only runtime skills
 
 The generated Codex marketplace now serves a supported subset instead of a
-1:1 mirror of Claude Code skills. `autonomous`, `rover`, `/whats-new`,
+1:1 mirror of Claude Code skills. `autonomous`, `/whats-new`,
 `/restart-claude-agents`, and the Claude PreToolUse toggle/status skills from
 `git-discipline` are omitted from Codex because their current runtime
-dependencies are Claude-only. Shared and Codex-specific skills continue to
-ship normally.
+dependencies are Claude-only. `rover` remains Codex-facing through a
+host-owned continuation contract rather than a direct dependency on
+`autonomous`.
 
 ## [2026-06] dont-do-that moved from leclause
 

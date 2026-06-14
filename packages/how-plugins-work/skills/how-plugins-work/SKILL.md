@@ -283,6 +283,22 @@ When a shared skill has a Claude-only block and still wants to be packaged for o
 
 Do not remove Claude frontmatter or hook guidance merely to satisfy another client. If another client needs stricter metadata, generate the stricter view or manifest beside the Claude source.
 
+### Host-owned capability contracts
+
+Shared skill text should describe capability contracts before concrete runtime
+routes. If the workflow needs something like "keep this loop moving," "get an
+independent review," "drive a browser," "send a notification," or "persist this
+state," write the invariant and the expected outcome, then let the active host
+satisfy it with whatever tooling exists there. Claude might use a plugin skill,
+an Agent tool, or a cron helper; Codex might use a goal loop, browser tool, or
+different delegation surface; a future agent may have another mechanism.
+
+Hard-code another skill, plugin, MCP server, or helper only when that dependency
+is itself the public API the workflow is about. Otherwise, name it as a
+runtime-specific example under a generic host-owned contract. This keeps
+cross-agent skills portable: they share the idea and the evidence requirements,
+not one agent's exact implementation path.
+
 ### Direction of dependency
 
 Public plugin documentation may define the generic sync contract. Private or project-specific generators may consume that contract and even assume this skill is installed. The reverse dependency is not allowed: a public plugin should not name a private synchronizer, private path, personal doctrine repo, or local machine convention.
