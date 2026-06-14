@@ -22,6 +22,7 @@ PLUGIN_PATH="__PLUGIN_INSTALL_PATH__"
 VALIDATOR="$PLUGIN_PATH/hooks/lib/validate-body.sh"
 SYNTH="$PLUGIN_PATH/hooks/lib/example-synth.sh"
 DENY_LIB="$PLUGIN_PATH/hooks/lib/deny-check.sh"
+CONFLICT_LIB="$PLUGIN_PATH/hooks/lib/conflict-markers.sh"
 
 # /git-discipline:disable-git lock check. Runs before the validator so a locked repo
 # cannot commit at all, regardless of message body. Soft-fails (no-op) if
@@ -31,6 +32,27 @@ if [[ -f "$DENY_LIB" ]]; then
   # shellcheck disable=SC1090
   . "$DENY_LIB"
   deny_check "commit"
+fi
+
+# Conflict-marker gate (shared lib with the PreToolUse guard). Runs before the
+# Merge/skip classification below so a default "Merge branch ..." message does not
+# exempt it. Soft-fails (no-op) when the lib is missing on an old install.
+if [[ -f "$CONFLICT_LIB" ]]; then
+  # shellcheck disable=SC1090
+  . "$CONFLICT_LIB"
+  # Empty command: only the env-var escape reaches the git-native layer (the magic
+  # comment lives in Claude's bash string, which git never sees).
+  if ! conflict_markers_escape_active ""; then
+    conflict_files=$(conflict_markers_find_files)
+    if [[ -n "$conflict_files" ]]; then
+      {
+        printf '\n[git-discipline/merge-conflict-markers] '
+        conflict_markers_format_message "$conflict_files"
+        printf '\n'
+      } >&2
+      exit 1
+    fi
+  fi
 fi
 
 msg_file="${1:-}"

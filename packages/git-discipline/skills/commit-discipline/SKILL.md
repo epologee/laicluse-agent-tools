@@ -688,6 +688,34 @@ For pushes you run yourself in a terminal, only
 `GIT_DISCIPLINE_ALLOW_WIP_PUSH=1` works; the git-native pre-push hook does not
 read the command string.
 
+### `GIT_DISCIPLINE_ALLOW_CONFLICT_MARKERS=1` or `# allow-conflict-markers`
+
+The `merge-conflict-markers` guard blocks a merge-finalizing command (`git
+commit`, `git merge --continue`, `git rebase --continue`) while one or more
+tracked files still hold a leftover conflict marker, so a half-resolved merge
+cannot land in a live checkout. Detection is `git diff --check` against both the
+working tree and the index, shared by the PreToolUse:Bash guard and the
+git-native commit-msg hook. Set `GIT_DISCIPLINE_ALLOW_CONFLICT_MARKERS=1`, or add
+`# allow-conflict-markers` to the command, to commit anyway. Use this for the
+rare case where a conflict region is intentionally part of a fixture being
+committed.
+
+**Asymmetry:** same as the wip-push gate, with one extra nuance for the env var.
+The `# allow-conflict-markers` magic comment only works when Claude executes the
+commit (the PreToolUse:Bash guard reads the bash command string); the git-native
+commit-msg hook never sees the command string. The env var works at both layers,
+but only when it is actually in the environment: a one-line *prefix*
+(`GIT_DISCIPLINE_ALLOW_CONFLICT_MARKERS=1 git commit ...`) propagates to the
+git process and so reaches the git-native hook, but the PreToolUse guard runs
+before the command executes and reads its own process environment, so the prefix
+does not reach it. For the PreToolUse layer, `export` the variable first (or use
+the magic comment).
+
+**Scope note:** git flags only lines a commit *adds* that are exactly seven
+conflict characters, so a differently-lengthed markdown underline or a
+pre-existing marker-like line never fires the guard; a newly-added
+exactly-seven-character divider does, and the escape covers it.
+
 ### `GIT_DISCIPLINE_TRIVIAL_OK=1`
 
 Set automatically by the PreToolUse:Bash guard when the staged diff has
