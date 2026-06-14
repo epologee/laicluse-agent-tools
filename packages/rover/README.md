@@ -45,10 +45,10 @@ scheduling hooks to pick a heartbeat. To configure a persistent host:
 - **Do not leave the cron tools reachable** on a persistent host: the probe then
   reads the run as interactive and schedules an unused cron.
 
-The mode the probe actually picked is visible after setup in the loop file's
-`cron_job_id`: `none (self-check heartbeat)` confirms the wake-up path,
-`none (persistent process)` means it fell through to batch (the wake-up hook was
-not reachable). See `autonomous`'s `keepalive` skill for the full contract.
+After setup the loop file's `cron_job_id` shows which mode was picked:
+`none (self-check heartbeat)` is the wake-up path, `none (persistent process)`
+means it fell through to batch (the wake-up hook was not reachable). See
+`autonomous`'s `keepalive` skill for the full contract.
 
 No other hard dependencies. Optional integrations (notifier, reviewbot,
 commit-splitter) are user-named at invocation and only used when installed.

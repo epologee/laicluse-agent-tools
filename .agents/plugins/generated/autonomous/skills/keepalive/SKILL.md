@@ -58,15 +58,9 @@ Branch on the result:
 
 ## The return contract
 
-Keepalive hands the caller exactly one value for the loop file's `cron_job_id` field:
+Keepalive hands the caller exactly one of three values to write into the loop file's `cron_job_id`: a cron job id (interactive), `none (self-check heartbeat)` (persistent self-pacing), or `none (persistent process)` (batch). With a cron, the loop's cron-dependent behaviour (STANDBY backoff, interjection reschedule, `wake` restore) is live. With a self-check heartbeat, the wake-up re-enters on its interval, beats the host stall timer, and ends by not rescheduling, while the cron-specific machinery no-ops. With neither, the phase machine runs once, end to end, and the mission ends through `stop`.
 
-- A cron job id — a cron heartbeat is scheduled; the caller is interactive.
-- `none (self-check heartbeat)` — a self-paced wake-up heartbeat is scheduled; the caller is a persistent process that can re-enter itself.
-- `none (persistent process)` — no heartbeat; the caller is a pure batch run and drives straight to completion.
-
-The caller (see `rover` setup) writes that value into the loop file and continues. With a cron, the loop's cron-dependent behaviour (STANDBY backoff, interjection reschedule, `wake` restore) is live. With a self-check heartbeat, the wake-up re-enters on its interval, beats the host stall timer, and ends by not rescheduling; the cron-specific machinery no-ops (no cron exists) while `selfcheck` carries the heartbeat. With neither, the phase machine runs once, end to end, and the mission ends through `stop`.
-
-**Canonical `cron_job_id` vocabulary.** This is the single owner of the marker strings every reader keys on. `cron`, `wake`, `stop`, and the `rover` loop-file template branch on these exact values; they reference this list rather than redefining it, so the spelling lives in one place:
+**Canonical `cron_job_id` vocabulary.** This table is the single owner of the marker strings every reader keys on. `cron`, `wake`, `stop`, and the `rover` loop-file template branch on these exact values and reference this list rather than respelling them:
 
 | Value | Meaning |
 |-------|---------|

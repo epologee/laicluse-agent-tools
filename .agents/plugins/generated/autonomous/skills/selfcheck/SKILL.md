@@ -7,13 +7,9 @@ description: Self-pacing heartbeat for a persistent process that can schedule it
 
 The heartbeat for a persistent process that has no cron but can schedule its own wake-ups.
 
-`cron` keeps an interactive session alive between idle turns. `selfcheck` does the same job for the other runtime that needs it: a persistent or continuous process (a conveyor line, a detached run) that the host supervises but does not pause between turns the way a REPL does. Such a process used to be assumed to drive straight to completion in one unbroken run. That assumption is false for a rover: it can **end a turn without re-driving the next one** (the goal mechanism does not always re-fire when a turn closes), go silent, and get killed by a host that watches for stalls. The case this skill covers is precisely that inter-turn gap. A multi-turn stretch like an INSPECT pass sequence (verify, then pride, then the end-user and technical subagents, then gurus, then trim) is a chain of separate turns, each yielding to idle in between; that is where the wake-up fires and where a quietly-dropped turn gets re-driven. This skill is the brake against that silent death. (The narrower case of one unbroken turn that never yields is out of scope; see "The boundary this does not cover".)
+`cron` keeps an interactive session alive between idle turns. `selfcheck` does the same job for the other runtime that needs it: a persistent or continuous process (a conveyor line, a detached run) that the host supervises but does not pause between turns the way a REPL does. Such a process was assumed to drive straight to completion in one unbroken run, but that is false for a rover: it can **end a turn without re-driving the next one** (the goal mechanism does not always re-fire when a turn closes), go silent, and get killed by a host that watches for stalls. The gap this skill covers is exactly that one between turns; the wake-up fires on idle and re-drives a quietly-dropped turn. (One unbroken turn that never yields is out of scope; see "The boundary".)
 
-## The hook this runtime exposes
-
-`keepalive` routes here only after its probe confirms the runtime exposes a **self-pacing wake-up hook** but no cron (see `keepalive` for the probe and why the two tool sets are disjoint by host design). The mechanism is whatever such hook the runtime exposes. In a Claude harness running `claude --bg` (the conveyor case) it is the `ScheduleWakeup` tool. Future agents and harnesses may expose a differently-named hook of the same shape — schedule a re-entry after N seconds, carrying a prompt that fires when the process next goes idle — and this skill is written against that shape, with `ScheduleWakeup` as the concrete instance the Claude harness ships; this matches the rest of the autonomy layer, where `cron` and `keepalive` name their Claude tools (`CronCreate`, `CronList`) the same way.
-
-The hook fires on idle, the same way cron does: a re-entry scheduled while the process is mid-turn waits until that turn yields. That is the point. The heartbeat is the safety net for the gap *between* turns, where a turn that closed without re-driving the next one would otherwise sit forever.
+`keepalive` routes here only after its probe finds a **self-pacing wake-up hook** but no cron (see `keepalive` for the probe). The mechanism is whatever such hook the runtime exposes; in a Claude `claude --bg` harness it is the `ScheduleWakeup` tool. The skill is written against the abstract shape — schedule a re-entry after N seconds, carrying a prompt that fires when the process next goes idle — with `ScheduleWakeup` as the concrete Claude instance, the same way `cron` and `keepalive` name `CronCreate`/`CronList`; a future agent may expose a differently-named hook of the same shape.
 
 ## No wakeup, no-op
 
@@ -29,15 +25,11 @@ The constraint that fixes this number is one inequality: `interval < stall_windo
 
 The value lands on 270 rather than 300 for a secondary reason that only some runtimes have: a prompt cache with a short TTL. A re-entry inside the TTL reads cached context instead of paying a full miss; the Claude harness's `ScheduleWakeup` guidance documents a 5-minute TTL and flags 300s as the worst case, so 270s stays just inside it. Where a runtime caches differently or not at all, this drops away and the inequality alone still picks a sub-window interval.
 
-**Invariant, not a magic number.** The default is tied to the host stall window on purpose; if that window changes, this constant must be revisited so the beat never lands too late. It is deliberately a fixed default in this layer, not derived from the host's config across a repo boundary (that cross-repo coupling is the mission's named follow-up) and not tuned per-order (a per-order override is a future hook, not built).
-
-*See also — where the stall window lives:* for the conveyor it is `STALL_TIMEOUT_MS` in `laicluse-agent-workbench`, `packages/conveyor/skills/start/bin/conveyor-start.mjs`, consumed by `pollUntilComplete` in `conveyor-lib.mjs`. A maintainer changing it there should grep `SELFCHECK_INTERVAL_SECONDS` here; nothing enforces the link automatically, so this pointer is the discovery path. (A separate `GOAL_STALL_TIMEOUT_MS` of 5 minutes applies only once the job-state reaches `done`; the 10-minute window is the one a live, still-working run races.) The hook clamps the delay to a sane range; 270 is well inside it.
+The constant is tied to the host's stall window, so it must be revisited if that window changes. For the conveyor the window is `STALL_TIMEOUT_MS` in `laicluse-agent-workbench`, `packages/conveyor/skills/start/bin/conveyor-start.mjs`; a maintainer changing it there should grep `SELFCHECK_INTERVAL_SECONDS` here, since nothing enforces the link automatically. Deriving the interval from that value across the repo boundary, or tuning it per-order, are deliberate non-goals here.
 
 ## Setup (first wake-up)
 
-`keepalive` calls this skill when its startup probe finds a persistent process that exposes a wake-up hook. Your job:
-
-The loop-file path arrives as the skill argument from `keepalive`, the same way `cron` receives its caller's path. Your job:
+`keepalive` calls this skill when its probe finds a persistent process with a wake-up hook, passing the loop-file path as the skill argument (the same way `cron` receives its caller's path). Your job:
 
 1. Schedule the first self-check wake-up via the runtime's hook (`ScheduleWakeup` in the Claude harness) at `SELFCHECK_INTERVAL_SECONDS`, carrying the standard self-check prompt below with `<FILENAME>` filled in.
 2. Return the sentinel `none (self-check heartbeat)` to the caller so it writes that value into the loop file's `cron_job_id`. The value is one of the canonical markers defined in `autonomous:keepalive` ("The return contract"); that section is the single owner of the marker vocabulary. The field name stays `cron_job_id` across all runtime modes for one uniform marker; here there is no live cron, the marker just records that a wake-up heartbeat is active.
@@ -103,9 +95,11 @@ To reschedule (steps 3 and 4): schedule the next wake-up at the heartbeat
 interval, carrying THIS SAME prompt with `<FILENAME>` already substituted,
 so the next fire is identical to this one.
 
-Every fire writes one timestamped Log beat. That loop-file write is how the
-host detects the run is still alive (it resets the host's stall timer); a
-fire that resets nothing defeats the entire purpose.
+Every fire writes one timestamped Log line (a "beat"; the "heartbeat" is
+the recurring wake-up itself). That loop-file write is how the host detects
+the run is still alive — it resets the host's stall timer — so a fire that
+writes nothing, even one that decided there was nothing to do, looks dead
+to the host and defeats the purpose.
 ```
 
 Replace `<FILENAME>` (the bare loop-file stem, e.g. `BUILD-AUTH-PAGE`, not
@@ -115,22 +109,10 @@ reschedule carries that already-substituted prompt forward unchanged. The
 prompt is frozen at first schedule: a later edit to this skill does not
 reach an in-flight run, which carries the version that started it.
 
-## Why the prompt is shaped this way
-
-The prompt above is the normative contract; this section is only the reasoning behind its three load-bearing moves. A *beat* throughout is one timestamped Log line written by a fire; the *heartbeat* is the recurring wake-up mechanism. The two are not the same word for the same thing.
-
-- **A beat is always written, even on a quiet pass.** The whole value of a fire is the loop-file write it produces: that write is how the host tells a live run from a dead one (see "The interval" for the concrete conveyor signal). A fire that decides "nothing to do" and writes nothing is, to the host, indistinguishable from a process that died.
-- **Stalled means re-engage, not just observe.** A quietly-ended turn is dangerous precisely because nothing re-drives it. The self-check is that re-drive: it does the next phase action itself, the same way a cron tick would. A heartbeat that only noted the stall without acting would still let the run die, slower.
-- **A terminal verdict beats a blind stall.** A run that is actually finished or actually blocked reaches `stop` with a real conclusion, so the operator reads a reason instead of a generic "went silent" from the host's stall timer.
-
 ## Teardown
 
-There is no cron to delete. The heartbeat ends by **not scheduling the next wake-up**. `stop` reaches its terminal verdict and simply does not reschedule; the already-fired wake-up was the last one. No explicit cancel call is needed, and none of the cron-deletion machinery applies. A caller that reads `cron_job_id: none (self-check heartbeat)` and looks for a live cron to cut finds none, which is correct.
+There is no cron to delete. The heartbeat ends by **not scheduling the next wake-up**. `stop` reaches its terminal verdict and simply does not reschedule; the already-fired wake-up was the last one. A caller that reads `cron_job_id: none (self-check heartbeat)` and looks for a live cron to cut finds none, which is correct.
 
-## The boundary this does not cover
+## The boundary
 
-The wake-up fires on idle, so this skill covers the gap *between* turns, not a single unbroken turn that runs past the stall window while writing nothing: with no idle moment the wake-up cannot fire, and with no write the host sees no progress. In practice the work is chopped into turns — each INSPECT pass, each `decide`, each commit yields to idle and touches the loop file — so any of those resets the timer on its own; the residual risk is one tool call (a subagent spawn, say) that blocks the full window in one shot. Catching a run that is *alive but quiet* inside such a call is a host-side problem (a stall detector that tells live-but-busy from dead), not this skill's; the same idle-fire limit applies to `cron`, which an interactive operator is present to notice. Naming the boundary keeps it honest; it is the mission's named complementary host-side fix, not a gap this skill pretends to close.
-
-## Why a separate skill
-
-Same reasoning as `cron`: the heartbeat logic is mechanical and repetitive, and inlining it in keepalive would blur the probe's single job. Keeping it separate means keepalive reads as a thin router, the interval policy and re-entry contract live in one place, and the two heartbeat mechanisms (`cron` for interactive sessions, `selfcheck` for persistent self-pacing processes) sit side by side as siblings with the same shape.
+The wake-up fires on idle, so this skill covers only the gap *between* turns. A single unbroken turn that runs past the stall window while writing nothing to the loop file is out of scope: with no idle moment the wake-up cannot fire. In practice the work is chopped into turns that each touch the loop file, so the residual risk is one tool call (a subagent spawn, say) that blocks the full window in one shot; catching a run that is alive but quiet inside such a call is the host-side complement the mission names, not this skill's job. The same idle-fire limit applies to `cron`.
