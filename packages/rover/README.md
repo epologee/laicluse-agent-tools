@@ -31,15 +31,24 @@ codex plugin add gurus@laicluse-agent-tools
 ```
 
 **Host contract for persistent runs.** The keep-alive probe reads the process's
-scheduling hooks to pick a heartbeat. A host that runs missions as a persistent
-process (a conveyor line, a detached run) must withhold the cron tools, by adding
-`CronCreate`, `CronDelete`, and `CronList` to its disallowed-tools list;
-otherwise the probe reads the run as interactive and schedules an unused
-heartbeat. Leaving a self-pacing wake-up hook reachable (the conveyor `claude
---bg` case) gets such a run a self-check heartbeat that keeps it from dying
-silently on the host's stall timer; withholding every scheduling hook makes it a
-pure batch run with no heartbeat. See `autonomous`'s `keepalive` skill for the
-full contract.
+scheduling hooks to pick a heartbeat. To configure a persistent host:
+
+- **Self-paced with a heartbeat** (recommended for a supervised run like a
+  conveyor line that watches for stalls): withhold `CronCreate`, `CronDelete`,
+  and `CronList` (add them to the disallowed-tools list), and leave the
+  self-pacing wake-up hook (`ScheduleWakeup` in `claude --bg`) reachable. The
+  probe schedules a self-check heartbeat that keeps the run from dying silently
+  on the host's stall timer.
+- **Pure batch, no heartbeat** (only when nothing supervises the run for
+  stalls): withhold every scheduling hook, the cron tools and the wake-up hook
+  alike. The probe schedules nothing and the run drives straight to completion.
+- **Do not leave the cron tools reachable** on a persistent host: the probe then
+  reads the run as interactive and schedules an unused cron.
+
+The mode the probe actually picked is visible after setup in the loop file's
+`cron_job_id`: `none (self-check heartbeat)` confirms the wake-up path,
+`none (persistent process)` means it fell through to batch (the wake-up hook was
+not reachable). See `autonomous`'s `keepalive` skill for the full contract.
 
 No other hard dependencies. Optional integrations (notifier, reviewbot,
 commit-splitter) are user-named at invocation and only used when installed.

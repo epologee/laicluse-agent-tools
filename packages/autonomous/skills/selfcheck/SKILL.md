@@ -27,7 +27,7 @@ This skill acts only when there is a real self-pacing hook to act on. It is a no
 SELFCHECK_INTERVAL_SECONDS = 270   # 4.5 minutes
 ```
 
-The one constraint that fixes this number is the **stall window**: the interval must fire well below it, so the beat each check writes resets the host's stall timer with margin before it expires. The conveyor expediter's stall window is 10 minutes (see the cross-repo pointer below); 270 seconds leaves a 5.5-minute margin, comfortably under it even if one wake-up fires late or the re-entry itself takes a moment. This is the load-bearing reason and it stands on its own.
+The one constraint that fixes this number is the **stall window**: the interval must fire well below it, so the beat each check writes resets the host's stall timer with margin before it expires. The conveyor expediter's stall window is 10 minutes (see the cross-repo pointer below); 270 seconds leaves a 5.5-minute margin. The margin is not the whole interval, though: because the wake-up fires on idle, the real gap between beats is the interval plus however long the turn in flight when it fires runs before yielding. A turn that runs four minutes before yielding stretches the effective gap to roughly 8.5 minutes, still inside the 10-minute window but no longer comfortable. So the margin absorbs ordinary turn lengths; a turn that by itself approaches `window − interval` is the regime the boundary section calls out, not a margin this constant can widen.
 
 A secondary, conditional reason nudges the exact value down to 270 rather than, say, 300: when the runtime's context is prompt-cached with a short TTL, a re-entry inside the TTL reads cached context instead of paying a full cache miss. The Claude harness's own `ScheduleWakeup` guidance documents a 5-minute cache TTL and flags 300s as the worst case (you pay the miss without amortising it); 270s stays just inside the window. If a given runtime caches differently or not at all, this reason simply does not apply and the stall-window reason alone still picks a sub-window interval.
 
@@ -53,27 +53,45 @@ Self-check heartbeat. Read the file `.autonomous/<FILENAME>.md` in this
 project. If it does not exist yet, the main run is still finishing setup;
 do nothing this tick. Otherwise run one self-check:
 
-1. Read the Phase and the `cron_job_id`, and the tail of the Log. Run
-   `date +%H:%M` first; never guess the time.
+1. Run `date +%H:%M` first; never guess the time. Read the Phase, the
+   `cron_job_id`, and the tail of the Log. Note the timestamp of the
+   PREVIOUS `self-check:` beat in the Log (if any); that is your reference
+   point for what counts as new progress.
 2. If `cron_job_id` is `stopped`, `paused`, or `failed`, the run was already
    cut (a wake-up that was in flight when `stop` ran). Write one beat noting
    the terminal marker, do NOT re-engage the phase machine, and do NOT
    reschedule. The heartbeat is over. Stop here.
-3. Otherwise classify the run:
-   - PROGRESSING: the last Log entry is recent and the phase machine is
-     visibly advancing. Nothing to re-engage. Write one timestamped beat
-     (`[HH:MM] self-check: progressing, Phase <X>`) and reschedule the
-     next wake-up at the interval.
-   - WAITING: the run is parked on an external arrival channel that will
-     re-enter on its own (a bg task that will notify, an operator message).
-     Write a beat noting what it waits on and reschedule.
-   - STALLED: the phase machine should have advanced but the last turn
-     ended without re-driving. Re-engage: pick up the current phase per the
-     rover Instructions and do the next action, then reschedule.
+3. Otherwise classify the run. The discriminator is REAL progress, not your
+   own beats: a `self-check:` Log line is never progress. Real progress is a
+   Phase change, or any non-beat Log entry, dated after the previous
+   `self-check:` beat.
+   - PROGRESSING: there IS real progress since the previous beat (or this is
+     the first beat and the last non-beat entry is newer than one interval).
+     The run is driving itself. Write one beat
+     (`[HH:MM] self-check: progressing, Phase <X>`) and reschedule.
+   - WAITING: no real progress, but the latest non-beat Log entry explicitly
+     says the run is parked on an external arrival channel that re-enters on
+     its own (a bg task that will notify, an operator message). Write a beat
+     naming what it waits on and reschedule. Do NOT re-engage; double-driving
+     a parked mission is wrong.
+   - STALLED: no real progress and no wait annotation — the phase machine
+     should have advanced but a turn ended without re-driving, and only beats
+     have kept the file warm. This is the case the heartbeat exists for.
+     Re-engage: follow the `## Instructions` section of THIS loop file for the
+     current Phase and do its next action, write a beat
+     (`[HH:MM] self-check: re-engaged <Phase>, <what you did>`), then
+     reschedule.
 4. If the run is genuinely finished or genuinely blocked with no path
-   forward, do not reschedule: reach a terminal verdict through `stop`
-   (done, or failed with a concrete reason). Ending the heartbeat is simply
-   not scheduling another wake-up.
+   forward, do not reschedule: reach a terminal verdict by invoking `stop`
+   with this loop file's path as the argument (`.autonomous/<FILENAME>.md`),
+   done or failed with a concrete reason. Passing the path matters: `stop`
+   with no argument asks an operator which file to stop, and no operator is
+   present. Ending the heartbeat is simply not scheduling another wake-up.
+
+To reschedule in steps 3's PROGRESSING/WAITING/STALLED branches: schedule
+the next wake-up at the heartbeat interval, carrying THIS SAME prompt with
+`<FILENAME>` already substituted to the real filename, so the next fire is
+identical to this one.
 
 Every fire writes a timestamped Log beat. Writing to the loop file bumps
 its modification time, which is the signal a host stall detector watches
@@ -81,7 +99,9 @@ its modification time, which is the signal a host stall detector watches
 a silent fire that resets nothing defeats the entire purpose.
 ```
 
-Replace `<FILENAME>` with the actual file.
+Replace `<FILENAME>` with the actual file (both in the body and in the
+step-4 `stop` argument) before scheduling the first wake-up; every later
+reschedule carries that already-substituted prompt forward unchanged.
 
 ## The re-entry contract
 
