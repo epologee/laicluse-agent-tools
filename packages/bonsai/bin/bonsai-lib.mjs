@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 export function git(repo, args) {
@@ -74,4 +74,102 @@ export function createWorktree({ repo, branch, base }) {
   }
   git(repo, ['worktree', 'add', '-b', branch, worktree, resolvedBase]);
   return { worktree, branch, base: resolvedBase, baseSha, port: computePort(dir) };
+}
+
+export function defaultBranch(repo) {
+  for (const candidate of ['main', 'master']) {
+    if (refExists(repo, `refs/heads/${candidate}`)) return candidate;
+  }
+  return null;
+}
+
+function parseWorktrees(repo) {
+  const out = git(repo, ['worktree', 'list', '--porcelain']);
+  const entries = [];
+  let cur = {};
+  for (const line of out.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      if (cur.path) entries.push(cur);
+      cur = { path: line.slice('worktree '.length) };
+    } else if (line.startsWith('branch ')) {
+      cur.branch = line.slice('branch '.length).replace('refs/heads/', '');
+    } else if (line === '' && cur.path) {
+      entries.push(cur);
+      cur = {};
+    }
+  }
+  if (cur.path) entries.push(cur);
+  return entries;
+}
+
+function isAncestor(repo, a, b) {
+  try {
+    git(repo, ['merge-base', '--is-ancestor', a, b]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function countRange(repo, range) {
+  try {
+    return parseInt(git(repo, ['rev-list', '--count', range]).trim(), 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function branchPushed(repo, branch) {
+  try {
+    const up = git(repo, ['rev-parse', '--abbrev-ref', `${branch}@{upstream}`]).trim();
+    if (!up) return false;
+    return countRange(repo, `${up}..${branch}`) === 0;
+  } catch {
+    return false;
+  }
+}
+
+export function classifyTeardown({ repo, target }) {
+  const worktrees = parseWorktrees(repo);
+  const abs = resolve(target);
+  let entry = worktrees.find((w) => resolve(w.path) === abs)
+    || worktrees.find((w) => w.branch === target)
+    || worktrees.find((w) => resolve(w.path) === resolve(join(repo, 'worktrees', target)));
+  if (!entry) throw new Error(`no worktree or branch matching ${target} in ${repo}`);
+  const { path: worktree, branch } = entry;
+  const def = defaultBranch(repo);
+  const dirty = git(worktree, ['status', '--porcelain']).trim().length > 0;
+  const integrated = def && branch ? isAncestor(repo, branch, def) : false;
+  const ahead = def && branch ? countRange(repo, `${def}..${branch}`) : 0;
+  const behind = def && branch ? countRange(repo, `${branch}..${def}`) : 0;
+  const pushed = branch ? branchPushed(repo, branch) : false;
+  const removable = integrated || (!dirty && ahead === 0);
+  const warnings = [];
+  if (ahead > 0 && !pushed) warnings.push(`${ahead} unpushed commit(s) ahead of ${def} would be orphaned by removal`);
+  if (behind > 0) warnings.push(`${def} advanced by ${behind} commit(s) since this branch; rebase before wrap`);
+  if (dirty) warnings.push('worktree has uncommitted changes');
+  if (branch && worktrees.filter((w) => w.branch === branch).length > 1) {
+    warnings.push(`branch ${branch} is checked out in more than one worktree`);
+  }
+  return { worktree, branch, integrated, dirty, ahead, behind, pushed, removable, warnings };
+}
+
+function keptReasonFor(c) {
+  if (c.dirty) return 'worktree has uncommitted changes; commit them or pass --force';
+  if (!c.integrated && c.ahead > 0) return `branch has ${c.ahead} unmerged commit(s); wrap them or pass --force`;
+  return 'not integrated and not safe to drop; pass --force to override';
+}
+
+export function teardownWorktree({ repo, target, force = false, dryRun = false }) {
+  const c = classifyTeardown({ repo, target });
+  const base = { worktree: c.worktree, branch: c.branch, removable: c.removable, warnings: c.warnings };
+  if (dryRun) return { ...base, removed: false, keptReason: c.removable ? null : keptReasonFor(c) };
+  if (!c.removable && !force) return { ...base, removed: false, keptReason: keptReasonFor(c) };
+  git(repo, ['worktree', 'remove', ...(force ? ['--force'] : []), c.worktree]);
+  if (c.branch) {
+    try {
+      git(repo, ['branch', force ? '-D' : '-d', c.branch]);
+    } catch {}
+  }
+  return { ...base, removed: true, keptReason: null };
 }

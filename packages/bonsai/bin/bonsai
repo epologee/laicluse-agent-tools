@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { createWorktree } from './bonsai-lib.mjs';
+import { createWorktree, teardownWorktree } from './bonsai-lib.mjs';
 
 const USAGE = `usage: bonsai <command> [options]
 
@@ -50,6 +50,35 @@ if (command === 'create') {
   try {
     const result = createWorktree({ repo, branch, base: values.base });
     out(values.json, result, `worktree ready at ${result.worktree} (branch ${result.branch}, dev port ${result.port})`);
+  } catch (err) {
+    die(err.message);
+  }
+} else if (command === 'teardown') {
+  let values;
+  let positionals;
+  try {
+    ({ values, positionals } = parseArgs({
+      args: rest,
+      allowPositionals: true,
+      options: {
+        repo: { type: 'string' },
+        force: { type: 'boolean', default: false },
+        'dry-run': { type: 'boolean', default: false },
+        json: { type: 'boolean', default: false },
+      },
+    }));
+  } catch (err) {
+    die(err.message);
+  }
+  const target = positionals[0];
+  if (!target) die('teardown needs a worktree path or branch name');
+  const repo = values.repo || process.cwd();
+  try {
+    const result = teardownWorktree({ repo, target, force: values.force, dryRun: values['dry-run'] });
+    const human = result.removed
+      ? `removed ${result.worktree}${result.warnings.length ? ` (warnings: ${result.warnings.join('; ')})` : ''}`
+      : `kept ${result.worktree}: ${result.keptReason}${result.warnings.length ? ` (warnings: ${result.warnings.join('; ')})` : ''}`;
+    out(values.json, result, human);
   } catch (err) {
     die(err.message);
   }
