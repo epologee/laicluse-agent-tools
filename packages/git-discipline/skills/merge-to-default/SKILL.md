@@ -14,7 +14,7 @@ Land the current branch on the project's default branch with a real `--no-ff` me
 - The user types `/git-discipline:merge-to-default` or says "merge naar default", "merge to main", or "merge this into main"
 - Local workflow without a PR step: the project does trunk-based development or accepts direct merges on the default branch
 
-Not for remote merges: this skill produces only local commits and does not push. Push is a separate, explicit user action.
+Not for remote merges: the merge itself is a local commit and this skill never pushes the default branch. One caveat: when the source branch is behind, Step 3 delegates the rebase to `git-discipline:rebase-latest-default`, which force-pushes the rebased *feature* branch (with `--force-with-lease`) when that branch is already published and push access allows it. That is the sub-skill's own push policy, not a default-branch push; a local-only feature branch is never pushed. Landing the default branch on the remote stays a separate, explicit user action.
 
 ## Step 0: Detect default branch and current branch
 
@@ -65,7 +65,7 @@ After the invocation: `git status --porcelain` is empty, otherwise stop with the
 
 A `--no-ff` merge of a branch that is behind the default can conflict, and that conflict materialises in the working tree of the default-branch checkout (Step 4 checks out `$DEFAULT` before merging) before any recovery runs. To guarantee the merge is always a clean commit on an up-to-date default, the source branch is rebased onto the latest default **first**, unconditionally whenever the default is ahead. The rebase is a precondition here, not a recovery: with the branch already up to date, Step 4 cannot produce a conflict from the branch being behind, so the stale-branch conflict-marker window this skill used to risk is closed. The only conflict that can still reach Step 4 is the narrow race where the default advances again between this rebase and the merge; Step 5 catches that one and aborts it immediately.
 
-Detect whether `$CURRENT` is behind the latest default. The branch is behind when it lacks any commit that exists on either the local `$DEFAULT` or `origin/$DEFAULT` ref (the loop checks both rather than reimplementing rebase-latest-default's freshest-target pick; a conservative match here only ever triggers a sub-skill call that then exits cleanly):
+Detect whether `$CURRENT` is behind the latest default. The branch is behind when it lacks any commit that exists on either the local `$DEFAULT` or `origin/$DEFAULT` ref. This gate is deliberately NOT a call into `git-discipline:rebase-latest-default`: that sub-skill runs a `git ls-remote` staleness check (its Step 1) before its own already-up-to-date exit, so invoking it unconditionally would make an already-current branch pay a network round-trip and could even block the merge on a "stale tracking ref, fetch first" stop it does not need. The loop is a coarse "is there anything to rebase?" check; it never picks the rebase target (the sub-skill still owns the freshest-target pick), so a conservative match only ever triggers a sub-skill call that exits cleanly without rebasing onto the wrong base:
 
 ```bash
 BEHIND=
@@ -83,21 +83,20 @@ After rebase-latest-default returns:
 - **Rebase completed:** continue to Step 4. `$CURRENT` now sits on top of the latest default, so the `--no-ff` merge is a clean commit.
 - **rebase-latest-default reports already up to date:** the conservative detection flagged the branch as behind a ref it already contains (e.g. `$CURRENT` is based on `origin/$DEFAULT` while a lagging local `$DEFAULT` looked ahead). The sub-skill did nothing; continue to Step 4 and report the rebase as skipped, not performed.
 - **rebase-latest-default stops needing a fetch:** when the target is `origin/$DEFAULT` and the tracking ref is stale, rebase-latest-default stops without rebasing and asks for a fetch. `merge-to-default` stops too, before any merge, with `$DEFAULT` untouched. Run `git fetch origin`, then invoke `/git-discipline:merge-to-default` again.
-- **Rebase stopped on genuine ambiguity:** rebase-latest-default only auto-resolves trivial conflicts; for genuine ambiguity (both sides made intentional, incompatible changes to the same logic) it stops mid-rebase and points at the conflicting files. `merge-to-default` then also stops, **before any merge**: the worktree sits mid-rebase on `$CURRENT`, `$DEFAULT` is untouched, and no merge commit and no conflict markers ever reach the default-branch checkout. This is the whole point of doing the rebase first. The user has three cleanup options:
-  - `git rebase --abort`: returns `$CURRENT` to the pre-rebase state. No merge happened. After that, the user can tackle the conflict differently.
+- **Rebase stopped on genuine ambiguity:** rebase-latest-default only auto-resolves trivial conflicts; for genuine ambiguity (both sides made intentional, incompatible changes to the same logic) it stops mid-rebase and points at the conflicting files. `merge-to-default` then also stops, **before any merge**: the worktree sits mid-rebase on `$CURRENT`, `$DEFAULT` is untouched, and no merge commit and no conflict markers ever reach the default-branch checkout. This is the whole point of doing the rebase first. The user has two cleanup options:
+  - `git rebase --abort`: returns `$CURRENT` to its pre-rebase tip; nothing merged, `$CURRENT` still unmerged. The user then either tackles the conflict differently or, once it is settled, re-invokes `/git-discipline:merge-to-default`. (After the abort a plain `git checkout $DEFAULT` parks on an intact default if the user wants to leave `$CURRENT`; a bare checkout *during* the rebase is refused, so abort first.)
   - Manually resolve the conflict, `git rebase --continue` per step, and then invoke `/git-discipline:merge-to-default` again to run the merge.
-  - `git rebase --abort` and then `git checkout $DEFAULT`: leaves `$CURRENT` at its pre-rebase tip and parks the user on an intact `$DEFAULT`. Nothing merged in this case; `$CURRENT` is still unmerged and the user re-invokes the skill once the conflict is settled. (A bare `git checkout` while the rebase is still in progress is refused; abort first.)
 
-  `merge-to-default` itself does not make any of these choices for the user; mid-rebase with genuine ambiguity is exactly the place where manual resolution is the right way.
+  `merge-to-default` itself does not make either of these choices for the user; mid-rebase with genuine ambiguity is exactly the place where manual resolution is the right way.
 
 ## Step 4: First-pass merge
 
-The branch arrives here up to date with the default (Step 3 rebased it or confirmed it was already current, or Step 5 rebased it after a residual conflict), so this merge is expected to be a clean commit. First save the tip of the source branch, then checkout and merge:
+The branch arrives here up to date with the default, so this merge is expected to be a clean commit. (Step 5's fallback re-enters this merge after its own rebase; it captures `PRE_MERGE_TIP` itself.) First save the tip of the source branch, then checkout and merge:
 
 ```bash
 PRE_MERGE_TIP=$(git rev-parse "$CURRENT")
-git checkout $DEFAULT
-git merge --no-ff --no-edit $CURRENT
+git checkout "$DEFAULT"
+git merge --no-ff --no-edit "$CURRENT"
 ```
 
 `PRE_MERGE_TIP` is used later in Step 6 to confirm that the merge actually integrated the source tip, independent of what some other process (e.g. another shell) does to the `$CURRENT` ref in the meantime.
@@ -115,20 +114,20 @@ Step 3 removes the stale-branch conflict that used to land here, so this fallbac
 
 ```bash
 git merge --abort
-git checkout $CURRENT
+git checkout "$CURRENT"
 ```
 
 Invoke `git-discipline:rebase-latest-default` via the Skill tool (the same single rebase tool Step 3 uses). After a successful rebase, capture the new source tip before the retry checkout, then repeat the checkout and merge from Step 4:
 
 ```bash
 PRE_MERGE_TIP=$(git rev-parse "$CURRENT")
-git checkout $DEFAULT
-git merge --no-ff --no-edit $CURRENT
+git checkout "$DEFAULT"
+git merge --no-ff --no-edit "$CURRENT"
 ```
 
-The merge should run cleanly now. If it still fails, surface the conflict and stop; that means the rebase could not resolve all ambiguity and the user must intervene manually.
+The merge should run cleanly now. This is a single retry: if it still conflicts (a second race in the same invocation), do not loop back for another rebase. Instead run `git merge --abort` so `$DEFAULT` is never left with conflict markers in its checkout, then surface the conflict and stop; the user re-invokes `/git-discipline:merge-to-default` once the default branch has settled.
 
-If rebase-latest-default itself stops on a non-trivial conflict, the worktree sits mid-rebase on `$CURRENT` and `$DEFAULT` is unchanged (the `git merge --abort` above already undid the merge attempt). Handle it exactly as the genuine-ambiguity case in Step 3: the same three cleanup options apply, and `merge-to-default` makes none of those choices for the user.
+If rebase-latest-default itself stops on a non-trivial conflict, the worktree sits mid-rebase on `$CURRENT` and `$DEFAULT` is unchanged (the `git merge --abort` above already undid the merge attempt). Handle it exactly as the genuine-ambiguity case in Step 3: the same two cleanup options apply, and `merge-to-default` makes neither of those choices for the user.
 
 ## Step 6: Clean up local source branch
 
@@ -161,6 +160,6 @@ Show a brief summary of what happened:
   Local source branch: deleted | kept (worktree at <path>)
 ```
 
-`<abbrev SHA>` comes from `git rev-parse --short HEAD`. `Files changed`, insertions, and deletions come from `git diff --shortstat $DEFAULT~1...$DEFAULT`. The `Rebase preceded merge` line distinguishes the Step 3 precondition rebase from the rare Step 5 fallback and from the up-to-date skip. The `Local source branch` line reflects what Step 6 did: `deleted` if `git branch -d` succeeded, `kept (worktree at <path>)` if the safety check skipped the delete, or `kept (delete failed: <reason>)` if `-d` failed for another reason.
+`<abbrev SHA>` comes from `git rev-parse --short HEAD`. `Files changed`, insertions, and deletions come from `git diff --shortstat $DEFAULT^1 $DEFAULT`: HEAD is the `--no-ff` merge commit, so `$DEFAULT^1` is the old default tip and this two-dot diff is what the merge brought in. (Three-dot `$DEFAULT~1...$DEFAULT` would diff against the merge base and report nothing useful on a merge commit.) The `Rebase preceded merge` line distinguishes the Step 3 precondition rebase from the rare Step 5 fallback and from the up-to-date skip. The `Local source branch` line reflects what Step 6 did: `deleted` if `git branch -d` succeeded, `kept (worktree at <path>)` if the safety check skipped the delete, or `kept (delete failed: <reason>)` if `-d` failed for another reason.
 
-Push does NOT happen in this skill. A push to the remote is a separate user-go (the user-CLAUDE.md push regime documents this). The user pushes themselves once they have validated the merge is correct.
+This skill never pushes the default branch; landing the merge on the remote is a separate user-go (the user-CLAUDE.md push regime documents this). The user pushes themselves once they have validated the merge is correct. The only push this flow can trigger is the feature-branch force-push owned by `git-discipline:rebase-latest-default` on the rebase path (see the When section).
