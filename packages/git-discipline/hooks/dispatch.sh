@@ -21,10 +21,17 @@ case "$EVENT" in
     source "$DIR/guards/git-config-override.sh"
     source "$DIR/guards/repo-deny.sh"
     source "$DIR/guards/sentinel-protect.sh"
+    source "$DIR/guards/merge-conflict-markers.sh"
     guard_git_dash_c "$INPUT"
     guard_git_config_override "$INPUT"
     guard_repo_deny "$INPUT"
     guard_sentinel_protect "$INPUT"
+    # allow-comment: a half-resolved merge must not land even when the
+    # allow-comment: commit-discipline nudges are toggled off, so the
+    # allow-comment: conflict-marker guard sits with the safety locks above the
+    # allow-comment: session/global disable check. Its own env/magic-comment
+    # allow-comment: escape is the intended bypass.
+    guard_merge_conflict_markers "$INPUT"
 
     SESSION_ID=$(dd_session_id "$INPUT")
     if [[ -n "$SESSION_ID" ]] && [[ -f "${LAICLUSE_HOME:-$HOME/.laicluse}/git-discipline/git-discipline-disabled-$SESSION_ID" ]]; then

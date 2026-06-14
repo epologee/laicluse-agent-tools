@@ -348,6 +348,51 @@ unset CLAUDE_COMMIT_RULE_STATE_FILE
 export GIT_DISCIPLINE_COMMIT_RULE_STATE_FILE="$TMP_STATE"
 reset_state
 
+# --- merge-conflict-markers: a finalizing commit is blocked while markers remain ---
+# Self-contained: build a real merge conflict in a throwaway repo, drive dispatch
+# from inside it. git writes the markers, so no marker literal lives in this file.
+
+expect_no_conflict_deny() {
+  local description="$1" payload="$2"
+  local stderr_file
+  stderr_file=$(mktemp)
+  echo "$payload" | bash "$DISPATCH" >/dev/null 2>"$stderr_file"
+  if grep -qF '[git-discipline/merge-conflict-markers]' "$stderr_file"; then
+    echo "FAIL [conflict-marker guard fired on a clean tree]: ${description}"
+    echo "  stderr: $(cat "$stderr_file")"
+    FAIL=$((FAIL + 1))
+  else
+    PASS=$((PASS + 1))
+  fi
+  rm -f "$stderr_file"
+}
+
+CONFLICT_REPO=$(mktemp -d)
+SMOKE_CWD=$(pwd)
+(
+  cd "$CONFLICT_REPO" || exit 1
+  git init -q -b main
+  git config user.email t@t; git config user.name t
+  printf 'l1\nshared\nl3\n' > f.txt; git add f.txt; git commit -q -m seed
+  git checkout -q -b sidebranch; printf 'l1\nAAA\nl3\n' > f.txt; git commit -q -am side
+  git checkout -q main; printf 'l1\nBBB\nl3\n' > f.txt; git commit -q -am main
+  git merge sidebranch >/dev/null 2>&1 || true
+)
+
+reset_state
+cd "$CONFLICT_REPO" || exit 1
+expect_deny "merge-conflict-markers: git commit denied while markers remain" \
+  "$(pretool_bash 'git commit -m "resolve"')" \
+  "merge-conflict-markers"
+# Resolve clean: the conflict guard must no longer fire (other guards may still
+# nudge the subject/body, but not with the conflict mnemonic). The --continue
+# branch and the staging/escape matrix are covered exhaustively in the bats suite.
+printf 'l1\nMERGED\nl3\n' > f.txt; git add f.txt
+expect_no_conflict_deny "merge-conflict-markers: clean tree clears the guard" \
+  "$(pretool_bash 'git commit -m "resolve"')"
+cd "$SMOKE_CWD" || exit 1
+rm -rf "$CONFLICT_REPO"
+
 # --- Cleanup ---
 
 rm -f "$TMP_STATE"
