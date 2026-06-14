@@ -1,6 +1,6 @@
 #!/bin/bash
-# PreToolUse:Edit|Write|MultiEdit guard. Blocks tool calls that introduce
-# a code comment in a programming-language source file. The reflex to add
+# PreToolUse file-edit guard. Blocks tool calls that introduce a code comment
+# in a programming-language source file. The reflex to add
 # a comment is usually a missed refactor (intent-revealing name, extracted
 # method, sharper signature); this guard pushes back on the easy path so
 # the structural option gets considered first.
@@ -25,15 +25,9 @@ guard_no_code_comments() {
   local tool file_path mode awk_lib
   tool=$(jq -r '.tool_name // empty' <<< "$input" 2>/dev/null)
   case "$tool" in
-    Edit|Write|MultiEdit) ;;
+    Edit|Write|MultiEdit|apply_patch) ;;
     *) return 0 ;;
   esac
-
-  file_path=$(jq -r '.tool_input.file_path // empty' <<< "$input" 2>/dev/null)
-  [ -z "$file_path" ] && return 0
-
-  mode=$(dd_ncc_mode_for "$file_path")
-  [ -z "$mode" ] && return 0
 
   if [ -n "${DIR:-}" ] && [ -f "$DIR/lib/comment-detect.awk" ]; then
     awk_lib="$DIR/lib/comment-detect.awk"
@@ -48,13 +42,27 @@ guard_no_code_comments() {
   fi
 
   case "$tool" in
+    apply_patch)
+      local patch
+      patch=$(dd_tool_patch "$input")
+      [ -z "$patch" ] && return 0
+      dd_ncc_check_patch "$patch" "$awk_lib"
+      ;;
     Edit)
+      file_path=$(jq -r '.tool_input.file_path // empty' <<< "$input" 2>/dev/null)
+      [ -z "$file_path" ] && return 0
+      mode=$(dd_ncc_mode_for "$file_path")
+      [ -z "$mode" ] && return 0
       local old_string new_string
       old_string=$(jq -r '.tool_input.old_string // ""' <<< "$input" 2>/dev/null)
       new_string=$(jq -r '.tool_input.new_string // ""' <<< "$input" 2>/dev/null)
       dd_ncc_check_pair "$file_path" "$mode" "$old_string" "$new_string" "$awk_lib"
       ;;
     Write)
+      file_path=$(jq -r '.tool_input.file_path // empty' <<< "$input" 2>/dev/null)
+      [ -z "$file_path" ] && return 0
+      mode=$(dd_ncc_mode_for "$file_path")
+      [ -z "$mode" ] && return 0
       local content existing
       content=$(jq -r '.tool_input.content // ""' <<< "$input" 2>/dev/null)
       if [ -f "$file_path" ]; then
@@ -65,6 +73,10 @@ guard_no_code_comments() {
       dd_ncc_check_pair "$file_path" "$mode" "$existing" "$content" "$awk_lib"
       ;;
     MultiEdit)
+      file_path=$(jq -r '.tool_input.file_path // empty' <<< "$input" 2>/dev/null)
+      [ -z "$file_path" ] && return 0
+      mode=$(dd_ncc_mode_for "$file_path")
+      [ -z "$mode" ] && return 0
       local count idx old new
       count=$(jq -r '.tool_input.edits | length // 0' <<< "$input" 2>/dev/null)
       [ -z "$count" ] && return 0
@@ -148,6 +160,74 @@ dd_ncc_check_pair() {
     dd_emit_deny no-code-comments \
 "Code comment introduced in ${file}:${lineno}:${short}. If the comment is load-bearing (citation, legal, pragma, workaround, debugging note), include 'allow-comment: <reason>' anywhere in the comment body or an http(s) URL. Otherwise rewrite the code so the intent shows in names, types, and structure instead of in prose."
   done <<< "$new_comments"
+}
+
+dd_ncc_check_patch() {
+  local patch="$1" awk_lib="$2"
+  local current_file="" current_mode="" additions="" line
+
+  dd_ncc_flush_patch_file() {
+    [ -n "$current_file" ] || return 0
+    [ -n "$current_mode" ] || return 0
+    [ -n "$additions" ] || return 0
+    dd_ncc_check_pair "$current_file" "$current_mode" "" "$additions" "$awk_lib"
+    additions=""
+  }
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "*** Add File: "*)
+        dd_ncc_flush_patch_file
+        current_file="${line#*** Add File: }"
+        current_mode=$(dd_ncc_mode_for "$current_file")
+        additions=""
+        continue
+        ;;
+      "*** Update File: "*)
+        dd_ncc_flush_patch_file
+        current_file="${line#*** Update File: }"
+        current_mode=$(dd_ncc_mode_for "$current_file")
+        additions=""
+        continue
+        ;;
+      "*** Delete File: "*)
+        dd_ncc_flush_patch_file
+        current_file=""
+        current_mode=""
+        additions=""
+        continue
+        ;;
+      "*** Move to: "*)
+        dd_ncc_flush_patch_file
+        current_file="${line#*** Move to: }"
+        current_mode=$(dd_ncc_mode_for "$current_file")
+        additions=""
+        continue
+        ;;
+      "+++ b/"*)
+        dd_ncc_flush_patch_file
+        current_file="${line#+++ b/}"
+        current_mode=$(dd_ncc_mode_for "$current_file")
+        additions=""
+        continue
+        ;;
+      "+++ "*)
+        dd_ncc_flush_patch_file
+        current_file="${line#+++ }"
+        [ "$current_file" = "/dev/null" ] && current_file=""
+        current_mode=$(dd_ncc_mode_for "$current_file")
+        additions=""
+        continue
+        ;;
+    esac
+
+    [ -n "$current_mode" ] || continue
+    case "$line" in
+      "+"*) additions+="${line#+}"$'\n' ;;
+    esac
+  done <<< "$patch"
+
+  dd_ncc_flush_patch_file
 }
 
 dd_ncc_is_allowed() {

@@ -14,8 +14,9 @@ guard_tool_error() {
   tr=$(dd_transcript "$input")
   [ -z "$tr" ] || [ ! -f "$tr" ] && return 0
 
-  local nudge_file="/tmp/.claude-nudge-error-${sid}"
-  local line_file="/tmp/.claude-nudge-error-line-${sid}"
+  local nudge_file line_file
+  nudge_file=$(dd_state_file "nudge-error" "$sid") || return 0
+  line_file=$(dd_state_file "nudge-error-line" "$sid") || return 0
   local count=0
   [ -f "$nudge_file" ] && count=$(cat "$nudge_file")
   [ "$count" -ge 2 ] 2>/dev/null && return 0

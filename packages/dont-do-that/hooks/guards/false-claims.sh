@@ -1,7 +1,7 @@
 #!/bin/bash
 # Stop guard. Blocks pre-existing / already-broken / known-issue rationalisations.
 # Always runs, even when an earlier guard in the same fire blocked
-# (it keeps its own line-tracking state in /tmp/.claude-false-claims-<sid>).
+# (it keeps its own per-session line-tracking state).
 
 guard_false_claims() {
   local input="$1"

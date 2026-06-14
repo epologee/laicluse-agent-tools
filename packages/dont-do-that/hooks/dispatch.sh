@@ -1,6 +1,7 @@
 #!/bin/bash
 # Single entry point for all dont-do-that hooks. Registered against
-# PreToolUse (Bash), PostToolUse (Edit|Write|Bash), and Stop in hooks.json.
+# PreToolUse (Bash|file-edit tools), PostToolUse (Bash|file-edit tools), and
+# Stop in hooks.json.
 # Routes to the right guard set based on hook_event_name in the stdin JSON.
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -25,7 +26,7 @@ case "$EVENT" in
         source "$DIR/guards/followup.sh"
         guard_followup "$INPUT"
         ;;
-      Edit|Write|MultiEdit)
+      Edit|Write|MultiEdit|apply_patch)
         source "$DIR/guards/no-code-comments.sh"
         guard_no_code_comments "$INPUT"
         ;;
@@ -35,7 +36,7 @@ case "$EVENT" in
   PostToolUse)
     TOOL=$(dd_tool_name "$INPUT")
     case "$TOOL" in
-      Edit|Write|Bash)
+      Edit|Write|MultiEdit|Bash|apply_patch)
         source "$DIR/guards/dash.sh"
         guard_dash "$INPUT"
         ;;
@@ -47,7 +48,7 @@ case "$EVENT" in
     [ -n "$DD_HEADLESS" ] && exit 0
     # false-claims and tool-error run in subshells so that an emit + exit in
     # one of them does not prevent the other from updating its own
-    # /tmp/.claude-<guard>-<sid> state on the same fire. Pre-refactor they
+    # per-session state on the same fire. Pre-refactor they
     # were separate processes with independent lifecycles; preserve that by
     # subshelling here. First non-empty output wins, in hooks.json order
     # (false-claims before tool-error).

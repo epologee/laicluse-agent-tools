@@ -242,6 +242,9 @@ Minimum copy rules:
 
 - Copy `bin/` into the generated target when a skill calls plugin helper
   commands.
+- Copy top-level runtime data files that copied helpers read. Today that means
+  `CHANGELOG.md` for `bin/check-broadcast`; without it the helper is present
+  but silent in Codex.
 - Do not copy source-package `agents/` into generated Codex targets by default.
   In this marketplace, `agents/` is a Claude runtime payload because Claude
   consumes the source package directly. A generated Codex package should carry

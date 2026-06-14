@@ -1,7 +1,7 @@
 #!/bin/bash
 # Smoke test suite for the dont-do-that dispatcher. Every case routes
 # through hooks/dispatch.sh with an explicit hook_event_name, so the test
-# covers the real path Claude Code takes at runtime.
+# covers the real runtime path.
 # Run from the plugin root: bash test/smoke-test.sh
 # Exit code 0 = all pass, 1 = failures.
 
@@ -28,6 +28,12 @@ posttool_edit() {
     '{hook_event_name:"PostToolUse", tool_name:"Edit", tool_input:{file_path:$f, new_string:$c}}'
 }
 
+posttool_apply_patch() {
+  local patch="$1"
+  jq -cn --arg p "$patch" \
+    '{hook_event_name:"PostToolUse", tool_name:"apply_patch", tool_input:{patch:$p}}'
+}
+
 pretool_edit() {
   local file="$1" old="$2" new="$3"
   jq -cn --arg f "$file" --arg o "$old" --arg n "$new" \
@@ -38,6 +44,12 @@ pretool_write() {
   local file="$1" content="$2"
   jq -cn --arg f "$file" --arg c "$content" \
     '{hook_event_name:"PreToolUse", tool_name:"Write", tool_input:{file_path:$f, content:$c}}'
+}
+
+pretool_apply_patch() {
+  local patch="$1"
+  jq -cn --arg p "$patch" \
+    '{hook_event_name:"PreToolUse", tool_name:"apply_patch", tool_input:{patch:$p}}'
 }
 
 expect_block() {
@@ -550,6 +562,12 @@ expect_context "dash: em-dash in Edit new_string" \
 expect_allow "dash: clean Edit new_string passes silent" \
   "$(posttool_edit "/tmp/x.md" "No dash here.")"
 
+expect_context "dash: em-dash in apply_patch added line" \
+  "$(posttool_apply_patch $'*** Begin Patch\n*** Update File: /tmp/x.ts\n@@\n const oldMessage = "No dash here.";\n+const newMessage = "Some prose with '"${EMDASH}"$' dash here.";\n*** End Patch\n')"
+
+expect_allow "dash: em-dash in apply_patch context line passes silent" \
+  "$(posttool_apply_patch $'*** Begin Patch\n*** Update File: /tmp/x.ts\n@@\n const oldMessage = "Some prose with '"${EMDASH}"$' dash here.";\n+const newMessage = "No dash here.";\n*** End Patch\n')"
+
 # --- no-code-comments ---
 
 expect_deny "no-code-comments: Edit adds // comment in .ts" \
@@ -669,6 +687,13 @@ expect_allow "no-code-comments: Edit on .css passes (style-only language)" \
 expect_deny "no-code-comments: MultiEdit first edit adds comment" \
   "$(jq -cn '{hook_event_name:"PreToolUse", tool_name:"MultiEdit", tool_input:{file_path:"/tmp/x.ts", edits:[{old_string:"a", new_string:"a;\n// added"}, {old_string:"b", new_string:"b;"}]}}')" \
   "no-code-comments"
+
+expect_deny "no-code-comments: apply_patch adds // comment in .ts" \
+  "$(pretool_apply_patch $'*** Begin Patch\n*** Update File: /tmp/x.ts\n@@\n let x = 1;\n+// dumb explanation\n+let y = 2;\n*** End Patch\n')" \
+  "no-code-comments"
+
+expect_allow "no-code-comments: apply_patch adds code without comment" \
+  "$(pretool_apply_patch $'*** Begin Patch\n*** Update File: /tmp/x.ts\n@@\n let x = 1;\n+let y = 2;\n*** End Patch\n')"
 
 expect_allow "no-code-comments: Edit adds JS regex literal with escaped slashes" \
   "$(pretool_edit "/tmp/x.ts" "let x = 1;" $'let x = 1;\nconst re = /https?:\\/\\//g;')"
